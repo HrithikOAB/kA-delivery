@@ -1,4 +1,4 @@
-/** Digi Mess partner app palette — from stitch design system. */
+/** Khana Delivery partner app palette — from stitch design system. */
 export const colors = {
   bg: '#fcf8ff',
   surface: '#ffffff',

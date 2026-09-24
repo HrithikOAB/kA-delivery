@@ -1,4 +1,4 @@
-/** Digi Mess brand tokens for the admin dashboard. */
+/** Khana Delivery brand tokens for the admin dashboard. */
 export const brand = {
   indigo: '#5B3DF5',
   indigoDark: '#4A2FE0',

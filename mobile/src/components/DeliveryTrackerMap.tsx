@@ -90,7 +90,11 @@ function StaticTrackerMap({
   onLayout: (e: LayoutChangeEvent) => void;
 }) {
   const [size, setSize] = useState({ width: 0, height: 0 });
-  const [mapFailed, setMapFailed] = useState(false);
+  // Default to OSM tiles — Google Static Maps often 403s (Static Maps API not
+  // enabled / referrer-restricted key) and renders a broken error image. OSM
+  // needs no key and aligns with the projected pins. The APK uses native
+  // Google Maps and never reaches this static fallback.
+  const [mapFailed, setMapFailed] = useState(true);
   const zoom = useMemo(() => pickOsmZoom(bounds), [bounds]);
   const googleMapUrl = useMemo(
     () => staticGoogleMapUrl(

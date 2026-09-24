@@ -435,7 +435,7 @@ export default function HelpSupport() {
             <Ionicons name="headset" size={22} color={colors.textMuted} />
           </View>
           <Text variant="label" style={styles.footerTitle}>
-            Digi Mess Partner Desk is available 24/7 via chat and phone.
+            Khana Delivery Partner Desk is available 24/7 via chat and phone.
           </Text>
           <Text variant="caption" style={styles.footerSubtext}>
             Our rider protection team monitors safety reports and payout disputes around the clock.

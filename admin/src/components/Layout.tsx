@@ -42,7 +42,7 @@ export function Layout() {
       <aside className="sidebar">
         <div className="brand">
           <span className="brand-mark" aria-hidden />
-          <span className="brand-text">Digi<span>Mess</span></span>
+          <span className="brand-text">Khana<span>Delivery</span></span>
         </div>
         <nav className="nav">
           {NAV.map(({ to, label, Icon, end }) => (

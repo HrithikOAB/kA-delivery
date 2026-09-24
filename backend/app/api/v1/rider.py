@@ -98,7 +98,7 @@ def _verification_out(db: Session, user: User) -> VerificationStatusOut:
         headline = "Application Under Review"
         subtitle = (
             "Your documents have been submitted and are currently being reviewed by the "
-            "Digi Mess compliance team. Typical review time is 2-4 hours."
+            "Khana Delivery compliance team. Typical review time is 2-4 hours."
         )
     elif docs:
         steps_completed = 1

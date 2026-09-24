@@ -239,7 +239,7 @@ def verify_customer_otp(
         user = User(
             phone=phone,
             email=None,
-            full_name=(full_name or "").strip() or "Digi Mess Customer",
+            full_name=(full_name or "").strip() or "Khana Delivery Customer",
             hashed_password=hash_password(secrets.token_urlsafe(16)),
             roles=UserRole.customer.value,
         )
@@ -247,7 +247,7 @@ def verify_customer_otp(
     elif not user.has_role(UserRole.customer):
         user.add_role(UserRole.customer)
 
-    if full_name and full_name.strip() and user.full_name in ("", "Digi Mess Customer"):
+    if full_name and full_name.strip() and user.full_name in ("", "Khana Delivery Customer"):
         user.full_name = full_name.strip()
 
     db.commit()

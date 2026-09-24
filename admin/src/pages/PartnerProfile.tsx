@@ -494,7 +494,7 @@ export function PartnerProfile() {
                   <div className="pp-assets-list">
                     <div className="pp-asset-row"><span>Delivery Bag (Thermal)</span><span className="pp-kyc-ok">Issued</span></div>
                     <div className="pp-asset-row"><span>Raincoat</span><span className="pp-kyc-ok">Issued</span></div>
-                    <div className="pp-asset-row"><span>DigiMess T-Shirt (×2)</span><span className="pp-kyc-ok">Issued</span></div>
+                    <div className="pp-asset-row"><span>Khana Delivery T-Shirt (×2)</span><span className="pp-kyc-ok">Issued</span></div>
                   </div>
                 </div>
 

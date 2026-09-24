@@ -65,7 +65,11 @@ function StaticDeliveryMap({
   bounds: ReturnType<typeof boundsFor>;
 }) {
   const [size, setSize] = useState({ width: 0, height: 0 });
-  const [mapFailed, setMapFailed] = useState(false);
+  // Default to OSM tiles: Google Static Maps requires the Static Maps API + a
+  // referrer-unrestricted key, which often 403s and renders a broken error
+  // image. OSM tiles need no key and align with our projected pins. (The APK's
+  // interactive path uses native Google Maps and never reaches this fallback.)
+  const [mapFailed, setMapFailed] = useState(true);
   const zoom = useMemo(() => pickOsmZoom(bounds), [bounds]);
   const tx = useSharedValue(0);
   const ty = useSharedValue(0);

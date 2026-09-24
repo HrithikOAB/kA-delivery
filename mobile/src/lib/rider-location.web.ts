@@ -74,7 +74,10 @@ export function useRiderLocationBroadcast(active: boolean) {
           else setStatus('error');
           setLastError(err.message || 'Could not read location');
         },
-        { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 },
+        // Desktop browsers have no GPS; forcing fresh high-accuracy fixes
+        // (maximumAge:0) makes getCurrentPosition time out. Allow a recent
+        // cached fix and network-based accuracy so web tracking is reliable.
+        { enableHighAccuracy: false, timeout: 27000, maximumAge: 15000 },
       );
     };
 

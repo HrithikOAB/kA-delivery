@@ -294,7 +294,7 @@ export default function RiderProfile() {
         <Button title="Log Out" variant="ghost" onPress={logout} style={styles.logoutBtn} />
 
         <Text variant="caption" style={styles.footer}>
-          Digi Mess Partner App v4.18.2 (Build 4910) ● All Systems Nominal
+          Khana Delivery Partner App v4.18.2 (Build 4910) ● All Systems Nominal
         </Text>
       </ScrollView>
     </View>

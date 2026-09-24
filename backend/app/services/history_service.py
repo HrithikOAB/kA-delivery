@@ -217,14 +217,14 @@ def seed_demo_history(db: Session, rider_id: int, customer_id: int, default_mess
     now = datetime.utcnow()
     demos = [
         (42, "Annapoorna Tiffin & South Mess", "Bellandur Tech Zone", 4.8, 18500, 2000, 1.4, 0),
-        (43, "Digi Mess Kitchen", "HSR Layout Sector 2", 3.2, 17200, 0, 1.0, 1),
+        (43, "Khana Delivery Kitchen", "HSR Layout Sector 2", 3.2, 17200, 0, 1.0, 1),
         (44, "Annapoorna Tiffin & South Mess", "Koramangala 5th Block", 5.1, 19800, 1500, 1.25, 2),
         (45, "South Spice Mess", "Bellandur Tech Zone", 2.4, 15600, 0, 1.0, 3),
-        (46, "Digi Mess Kitchen", "Indiranagar 100ft Road", 6.2, 21400, 2500, 1.5, 4),
+        (46, "Khana Delivery Kitchen", "Indiranagar 100ft Road", 6.2, 21400, 2500, 1.5, 4),
         (47, "Annapoorna Tiffin & South Mess", "Marathahalli Bridge", 4.0, 18100, 0, 1.2, 5),
         (48, "South Spice Mess", "HSR Layout Sector 7", 3.6, 16900, 1000, 1.0, 6),
     ]
-    cancelled = (49, "Digi Mess Kitchen", "Whitefield ITPL", 3.0, 0, 0, 1.0, 7)
+    cancelled = (49, "Khana Delivery Kitchen", "Whitefield ITPL", 3.0, 0, 0, 1.0, 7)
 
     def _add(order_id, mess_name, area, dist, earn, tip, surge, days_ago, cancelled=False):
         mid = _mess_id(mess_name)

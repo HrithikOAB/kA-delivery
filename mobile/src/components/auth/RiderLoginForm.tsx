@@ -72,7 +72,7 @@ export function RiderLoginForm() {
 
         <View style={styles.hubPill}>
           <View style={styles.hubDot} />
-          <Text variant="caption" style={styles.hubText}>Digi Mess Fleet Hub</Text>
+          <Text variant="caption" style={styles.hubText}>Khana Delivery Fleet Hub</Text>
         </View>
 
         <Text variant="h2" style={styles.title}>Welcome, Partner!</Text>

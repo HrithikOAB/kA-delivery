@@ -29,7 +29,7 @@ export function PartnerHeader({
         <View style={styles.brand}>
           <BrandLogo size={32} />
           <View>
-            <Text variant="h3" style={styles.brandText}>Digi Mess</Text>
+            <Text variant="h3" style={styles.brandText}>Khana Delivery</Text>
             <Text variant="caption" style={styles.partnerTag}>PARTNER</Text>
           </View>
         </View>

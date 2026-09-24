@@ -9,9 +9,9 @@ Demo credentials (password for all: ``password123``):
   * ops@digimess.app          — operations admin
   * customer@digimess.app     — customer
   * rider@digimess.app        — approved rider; login/delivery OTP is always 1212
-  * Pickup order is pre-seeded (new assignment at Digi Mess Kitchen)
+  * Pickup order is pre-seeded (new assignment at Khana Delivery Kitchen)
   * applicant@digimess.app    — rider whose application is under review (demo)
-  * mess@digimess.app         — mess/kitchen owner of "Digi Mess Kitchen"
+  * mess@digimess.app         — mess/kitchen owner of "Khana Delivery Kitchen"
   * combo@digimess.app        — customer + rider (to demo role switching)
 """
 from __future__ import annotations
@@ -200,7 +200,7 @@ def seed() -> None:
         if mess is None:
             mess = Mess(
                 owner_user_id=mess_owner.id,
-                name="Digi Mess Kitchen",
+                name="Khana Delivery Kitchen",
                 description="Home-style thalis and comfort meals.",
                 address_text="Shop 12, FC Road",
                 lat=MESS_LAT,

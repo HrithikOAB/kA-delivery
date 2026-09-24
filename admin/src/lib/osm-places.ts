@@ -5,7 +5,7 @@ export async function fetchOsmSuggestions(input: string): Promise<PlaceSuggestio
   if (q.length < 2) return [];
 
   const url = `https://nominatim.openstreetmap.org/search?format=json&addressdetails=1&limit=6&countrycodes=in&q=${encodeURIComponent(q)}`;
-  const res = await fetch(url, { headers: { Accept: 'application/json', 'User-Agent': 'DigiMessAdmin/1.0 (admin place search)' } });
+  const res = await fetch(url, { headers: { Accept: 'application/json', 'User-Agent': 'KhanaDeliveryAdmin/1.0 (admin place search)' } });
   if (!res.ok) throw new Error('OpenStreetMap search failed');
 
   const rows = await res.json() as Array<{ place_id: number; display_name: string; lat: string; lon: string; name?: string }>;

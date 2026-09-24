@@ -25,7 +25,7 @@ const VEHICLE_OPTIONS = [
 
 const EQUIPMENT = [
   'Insulated Delivery Box',
-  'Digi Mess Rainwear Set',
+  'Khana Delivery Rainwear Set',
   'Fleece Winter Jacket',
   'Thermal Bag Liner',
   'Helmet (Company Issued)',
