@@ -17,6 +17,11 @@ class Settings(BaseSettings):
         env_file=".env", env_file_encoding="utf-8", extra="ignore"
     )
 
+    # --- Environment ---
+    # Set ENVIRONMENT=production in prod. Gates the dev-only OTP bypass and
+    # demo-data seeding so neither can ship to a live deployment.
+    environment: str = "development"
+
     # --- Database ---
     database_url: str = "sqlite:///./digimess.db"
     auto_migrate_on_startup: bool = True
@@ -90,6 +95,10 @@ class Settings(BaseSettings):
         if raw == "*" or not raw:
             return ["*"]
         return [o.strip() for o in raw.split(",") if o.strip()]
+
+    @property
+    def is_production(self) -> bool:
+        return self.environment.strip().lower() in {"production", "prod"}
 
 
 @lru_cache

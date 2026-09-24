@@ -66,6 +66,10 @@ def init_database() -> None:
     if not settings.auto_seed_on_startup:
         return
 
+    if settings.is_production:
+        logger.warning("Production environment — skipping demo-data seed.")
+        return
+
     try:
         if is_database_empty():
             logger.info("Empty database detected — running seed…")

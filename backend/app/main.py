@@ -45,10 +45,15 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# `allow_origins=["*"]` with `allow_credentials=True` is an invalid combo that
+# browsers reject. Only enable credentials when explicit origins are configured
+# (set CORS_ORIGINS to your admin/web origins in production). Auth uses Bearer
+# tokens, not cookies, so credentials can stay off for the wildcard dev case.
+_cors_origins = settings.cors_origin_list
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.cors_origin_list,
-    allow_credentials=True,
+    allow_origins=_cors_origins,
+    allow_credentials=_cors_origins != ["*"],
     allow_methods=["*"],
     allow_headers=["*"],
 )

@@ -191,6 +191,17 @@ def assign_to_rider(db: Session, order_id: int, admin: User, rider_id: int) -> O
     if batch.rider_id is not None and batch.rider_id != rider.id:
         raise HTTPException(status_code=409, detail="Delivery is already assigned to another partner")
 
+    # Exclusive-offer policy: do not yank a live offer from a different partner.
+    # They must respond (or the offer must lapse/reject) before re-offering.
+    if any(
+        off.status == OfferStatus.sent and off.rider_id != rider.id
+        for off in batch.offers
+    ):
+        raise HTTPException(
+            status_code=409,
+            detail="This delivery is already offered to another partner. Wait for them to respond, or cancel that offer first.",
+        )
+
     # Clear any prior open offers for this batch, then offer to the chosen rider.
     for off in list(batch.offers):
         if off.status == OfferStatus.sent:

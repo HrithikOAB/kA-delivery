@@ -560,6 +560,12 @@ def accept_offer(db: Session, offer: DeliveryOffer, rider: User) -> DeliveryBatc
     if offer.rider_id != rider.id:
         raise PermissionError("Offer does not belong to this rider")
     batch = db.get(DeliveryBatch, offer.batch_id)
+    # Idempotent: this rider already holds the batch (e.g. double-tap / retry).
+    if batch is not None and batch.rider_id == rider.id:
+        return batch
+    # Assigned to someone else — give a precise message instead of a generic one.
+    if batch is not None and batch.rider_id is not None:
+        raise ValueError("This delivery was assigned to another partner")
     if not offer_is_actionable(offer, batch):
         raise ValueError("Offer is no longer available")
 

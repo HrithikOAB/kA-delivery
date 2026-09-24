@@ -197,6 +197,12 @@ export default function RiderDashboard() {
             {locError ? (
               <FeedbackBanner severity="error" message={locError} title="Location update failed" />
             ) : null}
+            {online && locStatus === 'tracking' ? (
+              <FeedbackBanner severity="success" title="Live location on" message="Customers and ops can track you in real time." />
+            ) : null}
+            {online && (locStatus === 'idle' || locStatus === 'requesting') ? (
+              <FeedbackBanner severity="info" title="Waiting for GPS" message="Allow location and keep the app open so your position is shared." />
+            ) : null}
 
             <PartnerCard variant="lowest" style={styles.earningsCard}>
               <View style={styles.earningsHeader}>
