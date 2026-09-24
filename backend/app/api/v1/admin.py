@@ -217,24 +217,24 @@ def request_correction(
 
 
 @router.post("/maps/places/autocomplete", response_model=list[PlaceSuggestionOut])
-def places_autocomplete(
+async def places_autocomplete(
     data: PlaceAutocompleteIn,
     _: User = Depends(_ops),
 ) -> list[PlaceSuggestionOut]:
     """Proxy Google Places autocomplete through the backend (avoids browser referrer restrictions)."""
     try:
-        rows = maps_service.search_places(data.input)
+        rows = await maps_service.search_places(data.input)
     except RuntimeError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
     return [PlaceSuggestionOut(place_id=r["place_id"], label=r["label"], secondary=r.get("secondary")) for r in rows]
 
 
 @router.get("/maps/places/{place_id}", response_model=PlaceDetailsOut)
-def places_details(
+async def places_details(
     place_id: str,
     _: User = Depends(_ops),
 ) -> PlaceDetailsOut:
-    details = maps_service.get_place_details(place_id)
+    details = await maps_service.get_place_details(place_id)
     if details is None:
         raise HTTPException(status_code=502, detail="Could not load place details")
     return PlaceDetailsOut(**details)

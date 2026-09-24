@@ -12,7 +12,7 @@ router = APIRouter(prefix="/maps", tags=["maps"])
 
 
 @router.get("/directions", response_model=DirectionsOut)
-def directions(
+async def directions(
     origin_lat: float = Query(..., ge=-90, le=90),
     origin_lng: float = Query(..., ge=-180, le=180),
     dest_lat: float = Query(..., ge=-90, le=90),
@@ -20,7 +20,7 @@ def directions(
     travel_mode: str = Query("TWO_WHEELER"),
     _: User = Depends(require_rider),
 ) -> DirectionsOut:
-    result = compute_directions(origin_lat, origin_lng, dest_lat, dest_lng, travel_mode=travel_mode)
+    result = await compute_directions(origin_lat, origin_lng, dest_lat, dest_lng, travel_mode=travel_mode)
     return DirectionsOut(
         points=[LatLngOut(**p) for p in result["points"]],
         distance_meters=result.get("distance_meters"),

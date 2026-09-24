@@ -68,7 +68,7 @@ def _straight_line(
     return pts
 
 
-def compute_directions(
+async def compute_directions(
     origin_lat: float,
     origin_lng: float,
     dest_lat: float,
@@ -100,8 +100,8 @@ def compute_directions(
     }
 
     try:
-        with httpx.Client(timeout=12.0) as client:
-            resp = client.post(ROUTES_URL, json=body, headers=headers)
+        async with httpx.AsyncClient(timeout=12.0) as client:
+            resp = await client.post(ROUTES_URL, json=body, headers=headers)
         if resp.status_code != 200:
             logger.warning("Google Routes API %s: %s", resp.status_code, resp.text[:300])
             raise RuntimeError("routes api error")
@@ -145,7 +145,7 @@ def _places_api_key() -> str:
     return settings.google_maps_api_key.strip()
 
 
-def search_places(query: str) -> list[dict[str, str | None]]:
+async def search_places(query: str) -> list[dict[str, str | None]]:
     api_key = _places_api_key()
     if not api_key:
         return []
@@ -161,8 +161,8 @@ def search_places(query: str) -> list[dict[str, str | None]]:
     }
 
     try:
-        with httpx.Client(timeout=10.0) as client:
-            resp = client.post(PLACES_AUTOCOMPLETE_URL, json=body, headers=headers)
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            resp = await client.post(PLACES_AUTOCOMPLETE_URL, json=body, headers=headers)
         if resp.status_code != 200:
             logger.warning("Places autocomplete %s: %s", resp.status_code, resp.text[:300])
             raise RuntimeError(f"Places autocomplete failed ({resp.status_code})")
@@ -186,7 +186,7 @@ def search_places(query: str) -> list[dict[str, str | None]]:
     return out
 
 
-def get_place_details(place_id: str) -> dict[str, float | str] | None:
+async def get_place_details(place_id: str) -> dict[str, float | str] | None:
     api_key = _places_api_key()
     if not api_key or not place_id.strip():
         return None
@@ -198,8 +198,8 @@ def get_place_details(place_id: str) -> dict[str, float | str] | None:
     }
 
     try:
-        with httpx.Client(timeout=10.0) as client:
-            resp = client.get(url, headers=headers)
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            resp = await client.get(url, headers=headers)
         if resp.status_code != 200:
             logger.warning("Places details %s: %s", resp.status_code, resp.text[:300])
             return None

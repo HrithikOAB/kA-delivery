@@ -101,6 +101,11 @@ def _txn_icon(txn_type: str) -> str:
 
 def build_wallet(db: Session, rider_id: int) -> dict:
     wallet = _get_or_create_wallet(db, rider_id)
+    # Credit delivered-order earnings into the ledger before reading balances so
+    # every caller reflects real earnings. Idempotent (keyed by ORD-<id>).
+    # Previously only the rider endpoint synced, so the admin partner view and
+    # withdrawals showed a stale ₹0 balance despite completed deliveries.
+    sync_from_deliveries(db, rider_id)
     profile = db.execute(
         select(RiderProfile).where(RiderProfile.user_id == rider_id)
     ).scalar_one_or_none()
