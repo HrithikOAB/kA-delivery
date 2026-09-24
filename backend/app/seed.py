@@ -115,6 +115,10 @@ def seed() -> None:
         elif rider.rider_profile is not None:
             rp = rider.rider_profile
             rp.is_online = True
+            # Ensure an online partner always has a position so the admin Live
+            # Tracking map can plot them even before their app broadcasts.
+            rp.last_lat = rp.last_lat if rp.last_lat is not None else RIDER_LAT
+            rp.last_lng = rp.last_lng if rp.last_lng is not None else RIDER_LNG
             rp.partner_code = rp.partner_code or "DM-PARTNER-7721"
             rp.rating = 4.92
             rp.vehicle_type = "scooter"

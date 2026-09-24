@@ -82,7 +82,10 @@ export function Operations() {
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
 
   const { data: deliveries, loading, error, stale, reload } = useAsync(
-    () => api.activeDeliveries(false),
+    // Include test orders too — they flow through the real dispatch/tracking
+    // pipeline, so Live Tracking must show them (passing `false` hid every
+    // test delivery, leaving the map and stage filters empty).
+    () => api.activeDeliveries(),
     [],
     config.liveTrackingPollMs,
   );
