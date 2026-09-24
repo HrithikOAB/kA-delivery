@@ -47,7 +47,9 @@ class Settings(BaseSettings):
     # --- Rider location policy ---
     location_update_interval_seconds: int = 5
     location_distance_threshold_meters: float = 30.0
-    location_stale_seconds: int = 30
+    # Markers grey out after this many seconds without a fresh fix. Kept well
+    # above the 5s post interval so brief network gaps don't drop live markers.
+    location_stale_seconds: int = 90
     location_max_jump_meters: float = 2000.0
     location_max_speed_mps: float = 55.0
 
