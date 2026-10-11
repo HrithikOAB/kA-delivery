@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from functools import lru_cache
 
-from pydantic import Field
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -25,10 +25,14 @@ class Settings(BaseSettings):
     # --- Database ---
     database_url: str = "sqlite:///./digimess.db"
     auto_migrate_on_startup: bool = True
-    auto_seed_on_startup: bool = True
+    # Demo-data seeding is OFF by default. Enable explicitly for local dev only;
+    # it must never populate a real deployment.
+    auto_seed_on_startup: bool = False
 
     # --- Auth / JWT ---
-    jwt_secret: str = "dev-secret-change-me"
+    # No usable fallback: a real deployment must supply JWT_SECRET. Empty is only
+    # tolerated outside production (see the validator below).
+    jwt_secret: str = ""
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 60 * 24
 
@@ -45,12 +49,16 @@ class Settings(BaseSettings):
     max_upload_bytes: int = 5 * 1024 * 1024  # 5 MB per document
 
     # --- Admin seed (super admin created by app.seed) ---
-    seed_admin_email: str = "admin@digimess.app"
+    seed_admin_email: str = "admin@kadelivery.app"
     seed_pickup_delivery: bool = True
     seed_active_delivery: bool = False
 
     # --- Rider location policy ---
     location_update_interval_seconds: int = 5
+    # A rider is only "genuinely online" if the app has checked in (posted a
+    # location or gone online) within this window. Covers force-closed apps that
+    # never send /rider/offline — they age out instead of showing online forever.
+    online_heartbeat_timeout_seconds: int = 900  # 15 minutes
     location_distance_threshold_meters: float = 30.0
     # Markers grey out after this many seconds without a fresh fix. Kept well
     # above the 5s post interval so brief network gaps don't drop live markers.
@@ -75,7 +83,13 @@ class Settings(BaseSettings):
     dispatch_offer_timeout_seconds: int = 86400  # 24h; offers end only on accept/reject
     dispatch_max_batch_size: int = 1
     dispatch_max_mess_radius_km: float = 8.0
-    default_rider_email: str = "rider@digimess.app"
+    # Optional operational override: if set, this rider is preferred by dispatch
+    # when eligible. Empty (default) means "no preferred rider" — dispatch picks
+    # the nearest eligible partner. No fabricated fallback address.
+    default_rider_email: str = ""
+    # Platform base fare paid to a rider per delivery (real pricing tunable, not
+    # a model-level magic default).
+    rider_base_fare_cents: int = 9000
 
     # --- WebSocket reconnect hints (surfaced to clients) ---
     ws_reconnect_base_ms: int = 1000
@@ -85,6 +99,9 @@ class Settings(BaseSettings):
     notification_provider: str = "dev"
     expo_access_token: str = ""
     payment_provider: str = "cod"
+    # Shared secret the booking app sends (X-API-Key) to the ingestion endpoint.
+    # Empty disables ingestion (endpoint returns 503) so it is never open by default.
+    integration_api_key: str = ""
 
     # --- CORS ---
     cors_origins: str = "*"
@@ -99,6 +116,15 @@ class Settings(BaseSettings):
     @property
     def is_production(self) -> bool:
         return self.environment.strip().lower() in {"production", "prod"}
+
+    @model_validator(mode="after")
+    def _require_secrets_in_production(self) -> "Settings":
+        """Fail fast: a production deployment must supply a real JWT secret."""
+        if self.is_production and not self.jwt_secret.strip():
+            raise ValueError(
+                "JWT_SECRET must be set in production (no dev fallback is provided)."
+            )
+        return self
 
 
 @lru_cache

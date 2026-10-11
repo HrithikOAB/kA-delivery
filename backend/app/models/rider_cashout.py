@@ -14,5 +14,6 @@ class RiderCashout(Base, TimestampMixin):
     id: Mapped[int] = mapped_column(primary_key=True)
     rider_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
     amount_cents: Mapped[int] = mapped_column(Integer)
-    fee_cents: Mapped[int] = mapped_column(Integer, default=500)
-    status: Mapped[str] = mapped_column(String(24), default="completed")
+    # Fee and status are supplied by the cashout flow, never assumed.
+    fee_cents: Mapped[int] = mapped_column(Integer)
+    status: Mapped[str] = mapped_column(String(24))

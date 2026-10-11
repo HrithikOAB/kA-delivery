@@ -7,7 +7,7 @@ from sqlalchemy import select
 from tests.conftest import _auth, login
 
 
-def admin_token(client, email="admin@digimess.app") -> str:
+def admin_token(client, email="admin@kadelivery.app") -> str:
     return login(client, "admin", email)
 
 

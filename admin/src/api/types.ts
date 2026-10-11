@@ -128,7 +128,7 @@ export interface PartnerListItem {
   current_batch_id: number | null;
   total_deliveries: number;
   partner_code: string | null;
-  rating: number;
+  rating: number | null;
   vehicle_type: string;
   vehicle_model: string;
   vehicle_number: string;
@@ -141,6 +141,7 @@ export interface PartnerListItem {
   last_lng: number | null;
   location_updated_at: string | null;
   location_is_stale: boolean;
+  last_seen_at: string | null;
 }
 
 export interface AdminDeliveryRow {
@@ -189,16 +190,16 @@ export interface PartnerAdminNote { id: number; text: string; author_id: number 
 export interface PartnerDetail extends PartnerListItem {
   license_number: string;
   correction_reason: string | null;
-  fleet_tier: string;
+  fleet_tier: string | null;
   bank_name: string;
   bank_account_masked: string;
   upi_linked: boolean;
   phone_verified: boolean;
-  rc_status: string;
-  documents_valid_until: string;
+  rc_status: string | null;
+  documents_valid_until: string | null;
   emergency_contact: string;
   contact_email: string | null;
-  vehicle_fuel_type: string;
+  vehicle_fuel_type: string | null;
   shift_preference: string;
   max_active_orders: number;
   total_earned_cents: number;
@@ -249,12 +250,88 @@ export interface OrderSummary {
   delivery_status: string | null;
   total_cents: number;
   created_at: string;
+  fulfillment_type: string;
+  external_provider: string | null;
+}
+
+export interface OrderMessInfo {
+  mess_id: number;
+  name: string;
+  address_text: string;
+  lat: number;
+  lng: number;
+  contact_phone: string;
+}
+
+export interface OrderCustomerInfo {
+  name: string;
+  phone: string | null;
+  dropoff_text: string;
+  dropoff_lat: number;
+  dropoff_lng: number;
+  note: string;
+}
+
+export interface OrderItemLine {
+  name: string;
+  unit_price_cents: number;
+  quantity: number;
+  line_total_cents: number;
+}
+
+export interface OrderAssignment {
+  rider_id: number | null;
+  rider_name: string | null;
+  rider_phone: string | null;
+  delivery_status: string | null;
+  batch_status: string | null;
+  offer_pending: boolean;
+  offered_rider_id: number | null;
 }
 
 export interface OrderDetail extends OrderSummary {
   dropoff_text: string;
+  subtotal_cents: number;
+  delivery_fee_cents: number;
+  tax_cents: number;
+  payment_status: string;
+  payment_method: string;
+  external_reference: string | null;
+  external_note: string | null;
+  external_status: string | null;
+  source: string;
+  mess: OrderMessInfo | null;
+  customer: OrderCustomerInfo | null;
+  items: OrderItemLine[];
+  assignment: OrderAssignment | null;
   timeline: AuditEvent[];
   issues: DeliveryIssue[];
+}
+
+export interface CandidateRider {
+  rider_id: number;
+  full_name: string;
+  phone: string | null;
+  is_online: boolean;
+  rating: number | null;
+  vehicle_type: string;
+  distance_km: number | null;
+  location_is_stale: boolean;
+  active_order_id: number | null;
+  active_mess_id: number | null;
+  available: boolean;
+  unavailable_reason: string | null;
+}
+
+export type ExternalProvider = 'zomato' | 'swiggy' | 'other';
+export type ExternalDeliveryStatus = 'assigned' | 'picked_up' | 'delivered' | 'cancelled';
+
+export interface AssignOrderPayload {
+  mode: 'internal' | 'external';
+  rider_id?: number;
+  provider?: ExternalProvider;
+  reference?: string;
+  note?: string;
 }
 
 export interface RiderMarker {
@@ -314,7 +391,7 @@ export interface WithdrawalRequest {
   rider_name: string;
   partner_code: string | null;
   fleet_tier: string;
-  rating: number;
+  rating: number | null;
   amount_cents: number;
   fee_cents: number;
   net_amount_cents: number;
@@ -364,7 +441,7 @@ export interface WithdrawalDetail extends WithdrawalRequest {
     full_name: string;
     partner_code: string | null;
     operating_hub: string;
-    rating: number;
+    rating: number | null;
     total_deliveries: number;
     active_since: string | null;
     fleet_tier: string;

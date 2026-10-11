@@ -24,7 +24,7 @@ from app.models.enums import (
 from app.models.mess import Mess
 from app.models.order import Order
 from app.models.user import RiderProfile, User
-from app.services import notification_service, state_machine
+from app.services import notification_service, presence_service, state_machine
 from app.services.eta_service import haversine_km
 
 
@@ -67,6 +67,7 @@ def ensure_batch_for_ready_order(db: Session, order: Order) -> DeliveryBatch:
         batch_id=batch.id,
         status=DeliveryStatus.pending,
         sequence=len(seq),
+        base_fare_cents=settings.rider_base_fare_cents,
         earning_cents=_delivery_earning(order),
     )
     db.add(delivery)
@@ -113,6 +114,8 @@ def eligible_riders(db: Session, batch: DeliveryBatch) -> list[tuple[User, float
     for profile in profiles:
         if not profile.is_approved:
             continue
+        if not presence_service.is_effectively_online(db, profile):
+            continue
         if profile.user_id in already or profile.user_id in busy:
             continue
         user = db.get(User, profile.user_id)
@@ -135,7 +138,9 @@ def eligible_riders(db: Session, batch: DeliveryBatch) -> list[tuple[User, float
 def _rider_is_assignable(db: Session, rider: User, batch: DeliveryBatch) -> bool:
     """True when the rider can take this batch (online, approved, not busy)."""
     profile = rider.rider_profile
-    if profile is None or not profile.is_approved or not profile.is_online:
+    if profile is None or not profile.is_approved:
+        return False
+    if not presence_service.is_effectively_online(db, profile):
         return False
     if not rider.has_role(UserRole.rider):
         return False
@@ -162,11 +167,13 @@ def _rider_is_assignable(db: Session, rider: User, batch: DeliveryBatch) -> bool
 
 def resolve_assignable_rider(db: Session, batch: DeliveryBatch) -> User | None:
     """Pick the configured default rider when online, else the nearest eligible rider."""
-    default = db.execute(
-        select(User).where(User.email == settings.default_rider_email.lower())
-    ).scalar_one_or_none()
-    if default is not None and _rider_is_assignable(db, default, batch):
-        return default
+    preferred_email = settings.default_rider_email.strip().lower()
+    if preferred_email:
+        default = db.execute(
+            select(User).where(User.email == preferred_email)
+        ).scalar_one_or_none()
+        if default is not None and _rider_is_assignable(db, default, batch):
+            return default
     candidates = eligible_riders(db, batch)
     return candidates[0][0] if candidates else None
 

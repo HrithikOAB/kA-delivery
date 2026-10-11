@@ -26,12 +26,21 @@ function verificationMeta(status: string) {
   if (['submitted', 'under_review', 'pending'].includes(status)) return { label: 'Pending Docs', cls: 'ver-warn' };
   return { label: 'Action Required', cls: 'ver-danger' };
 }
+function lastSeenLabel(iso: string | null): string | null {
+  if (!iso) return null;
+  const mins = Math.floor((Date.now() - new Date(iso).getTime()) / 60000);
+  if (mins < 1) return 'seen just now';
+  if (mins < 60) return `seen ${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `seen ${hrs}h ago`;
+  return `seen ${Math.floor(hrs / 24)}d ago`;
+}
 function fleetStatus(p: PartnerListItem) {
   if (!p.account_active) return { label: 'SUSPENDED', cls: 'fleet-suspended', sub: p.suspended_reason };
   if (p.is_online && p.active_order_id) return { label: 'ONLINE', cls: 'fleet-online', sub: `Order #${p.active_order_id}` };
   if (p.is_online && p.payout_pending) return { label: 'BUSY', cls: 'fleet-busy', sub: 'Payout processing' };
-  if (p.is_online) return { label: 'ONLINE', cls: 'fleet-online', sub: null };
-  return { label: 'OFFLINE', cls: 'fleet-offline', sub: null };
+  if (p.is_online) return { label: 'ONLINE', cls: 'fleet-online', sub: lastSeenLabel(p.last_seen_at) };
+  return { label: 'OFFLINE', cls: 'fleet-offline', sub: lastSeenLabel(p.last_seen_at) };
 }
 function exportCsv(rows: PartnerListItem[]) {
   const header = ['Name', 'Partner ID', 'Phone', 'Hub', 'Vehicle', 'Status', 'Trips', 'Wallet', 'Week Earnings'];
@@ -72,8 +81,8 @@ export function Partners() {
   }, [data]);
 
   const avgRating = useMemo(() => {
-    const items = data?.partners.items ?? [];
-    return items.length ? (items.reduce((s, p) => s + p.rating, 0) / items.length).toFixed(2) : '—';
+    const rated = (data?.partners.items ?? []).filter((p) => p.rating != null);
+    return rated.length ? (rated.reduce((s, p) => s + (p.rating ?? 0), 0) / rated.length).toFixed(2) : '—';
   }, [data]);
 
   const pageCount = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
@@ -121,7 +130,7 @@ export function Partners() {
                     const veh = vehicleTag(p.vehicle_type); const ver = verificationMeta(p.approval_status); const st = fleetStatus(p);
                     return (
                       <tr key={p.rider_id} className="clickable" onClick={() => navigate(`/partners/${p.rider_id}`)} style={{ cursor: 'pointer' }}>
-                        <td><div className="partner-cell"><div className="lt-avatar sm">{initials(p.full_name)}</div><div><div className="partner-name">{p.full_name}</div><div className="partner-meta">{partnerId(p)} · <span className="lt-rating">★ {p.rating.toFixed(1)}</span></div></div></div></td>
+                        <td><div className="partner-cell"><div className="lt-avatar sm">{initials(p.full_name)}</div><div><div className="partner-name">{p.full_name}</div><div className="partner-meta">{partnerId(p)} · <span className="lt-rating">★ {p.rating != null ? p.rating.toFixed(1) : '—'}</span></div></div></div></td>
                         <td><div className="partner-phone">{p.phone ?? '—'}</div><div className="muted partner-hub">{p.operating_hub || 'Unassigned hub'}</div></td>
                         <td><div className="partner-vehicle">{p.vehicle_model || p.vehicle_type}</div><div className="muted">{p.vehicle_number}</div><span className={`veh-tag ${veh.cls}`}>{veh.label}</span></td>
                         <td><span className={`fleet-pill ${st.cls}`}>{st.label}</span>{st.sub && <div className="muted fleet-sub">{st.sub}</div>}</td>

@@ -163,7 +163,7 @@ export function Withdrawals() {
                           <div className="lt-avatar sm">{initials(r.rider_name)}</div>
                           <div>
                             <div className="partner-name">{r.rider_name}</div>
-                            <div className="partner-meta">{r.partner_code} · ★ {r.rating.toFixed(1)}</div>
+                            <div className="partner-meta">{r.partner_code} · ★ {r.rating != null ? r.rating.toFixed(1) : '—'}</div>
                             {r.fleet_tier && <span className="wd-tier">{r.fleet_tier}</span>}
                           </div>
                         </div>

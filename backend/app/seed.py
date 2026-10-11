@@ -4,7 +4,7 @@ Run with:  python -m app.seed
 Idempotent: it will not duplicate rows if run twice.
 
 Demo credentials (password for all: ``password123``):
-  * admin@digimess.app        — super admin (admin dashboard)
+  * admin@kadelivery.app        — super admin (admin dashboard)
   * verifier@digimess.app     — partner-verification admin
   * ops@digimess.app          — operations admin
   * customer@digimess.app     — customer
@@ -53,7 +53,7 @@ def seed() -> None:
     with SessionLocal() as db:
         # --- Admins (no public signup; created here only) ---
         super_admin, _ = _get_or_create_user(
-            db, "admin@digimess.app",
+            db, "admin@kadelivery.app",
             full_name="Aditi Admin", phone="+919000000010",
             roles=UserRole.admin.value,
         )
@@ -273,7 +273,7 @@ def seed() -> None:
                     expires_at=datetime(2026, 12, 31),
                 ))
 
-        from app.services import active_delivery_service, earnings_service, history_service, support_service, wallet_service, withdrawal_admin_service
+        from app.services import earnings_service, history_service, support_service, wallet_service, withdrawal_admin_service
         from app.models.support_ticket import SupportTicket
         support_service.seed_faqs(db)
         if mess and rider:
@@ -281,10 +281,6 @@ def seed() -> None:
             earnings_service.seed_earnings_demo(db, rider.id, customer.id, mess.id)
             wallet_service.seed_wallet_demo(db, rider.id)
             withdrawal_admin_service.seed_admin_withdrawals(db, rider.id)
-            if settings.seed_pickup_delivery:
-                active_delivery_service.seed_demo_pickup_delivery(db, rider.id, customer.id, mess.id)
-            elif settings.seed_active_delivery:
-                active_delivery_service.seed_demo_active_delivery(db, rider.id, customer.id, mess.id)
         rider_user = db.execute(select(User).where(User.email == "rider@digimess.app")).scalar_one_or_none()
         if rider_user and not db.execute(select(SupportTicket).where(SupportTicket.rider_id == rider_user.id)).scalars().first():
             db.add(SupportTicket(

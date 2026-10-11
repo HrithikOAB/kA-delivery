@@ -18,6 +18,8 @@ from app.schemas.delivery import (
 )
 
 DAY_SHORT = ["M", "T", "W", "T", "F", "S", "S"]
+from app.config import settings
+
 CASHOUT_FEE_CENTS = 500
 
 
@@ -439,6 +441,7 @@ def seed_earnings_demo(db: Session, rider_id: int, customer_id: int, default_mes
                 rider_id=rider_id,
                 status=DeliveryStatus.delivered,
                 delivered_at=delivered,
+                base_fare_cents=settings.rider_base_fare_cents,
                 earning_cents=earn,
                 tip_cents=tip,
                 active_minutes=38 + t * 2,

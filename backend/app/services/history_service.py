@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.config import settings
 from app.models.delivery import Delivery
 from app.models.enums import DeliveryStatus, OrderStatus
 from app.models.mess import Mess
@@ -268,6 +269,7 @@ def seed_demo_history(db: Session, rider_id: int, customer_id: int, default_mess
             sequence=0,
             picked_up_at=delivered - timedelta(minutes=20),
             delivered_at=delivered if not cancelled else None,
+            base_fare_cents=settings.rider_base_fare_cents,
             earning_cents=earn,
             tip_cents=tip,
             surge_multiplier=surge,

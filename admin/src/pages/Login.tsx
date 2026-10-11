@@ -5,7 +5,7 @@ import { useAuth } from '@/auth/AuthContext';
 export function Login() {
   const { me, login } = useAuth();
   const navigate = useNavigate();
-  const [email, setEmail] = useState('admin@digimess.app');
+  const [email, setEmail] = useState('admin@kadelivery.app');
   const [password, setPassword] = useState('');
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -45,7 +45,7 @@ export function Login() {
           {busy ? 'Signing in…' : 'Sign in'}
         </button>
         <p className="muted" style={{ fontSize: 12, marginBottom: 0 }}>
-          Demo: admin@digimess.app / password123
+          Demo: admin@kadelivery.app / password123
         </p>
       </form>
     </div>

@@ -1,8 +1,12 @@
 /** Typed admin API client. JWT is kept in memory + localStorage. */
 import { config } from '@/config';
+import { recordApiCall } from '@/api/api-log';
 import type {
   ActiveDelivery,
+  AssignOrderPayload,
+  CandidateRider,
   DeliveryIssue,
+  ExternalDeliveryStatus,
   Me,
   Overview,
   OrderDetail,
@@ -48,6 +52,16 @@ async function request<T>(
   const { method = 'GET', body, auth = true } = options;
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
   if (auth && authToken) headers.Authorization = `Bearer ${authToken}`;
+  const started = performance.now();
+  const log = (fields: { status: number; ok: boolean; responseBody?: unknown; error?: string }) =>
+    recordApiCall({
+      method,
+      path,
+      requestBody: body,
+      durationMs: Math.round(performance.now() - started),
+      timestamp: Date.now(),
+      ...fields,
+    });
   let resp: Response;
   try {
     resp = await fetch(`${config.apiUrl}/api/v1${path}`, {
@@ -56,14 +70,19 @@ async function request<T>(
       body: body !== undefined ? JSON.stringify(body) : undefined,
     });
   } catch {
+    log({ status: 0, ok: false, error: 'Network error' });
     throw new ApiError(0, 'Network error — is the backend reachable?');
   }
   if (resp.status === 401) {
     setToken(null);
   }
-  if (resp.status === 204) return undefined as T;
+  if (resp.status === 204) {
+    log({ status: 204, ok: true });
+    return undefined as T;
+  }
   const text = await resp.text();
   const data = text ? safeJson(text) : null;
+  log({ status: resp.status, ok: resp.ok, responseBody: data });
   if (!resp.ok) {
     throw new ApiError(resp.status, extractDetail(data) ?? `Request failed (${resp.status})`);
   }
@@ -138,6 +157,12 @@ export const api = {
   orders: (params: { q?: string; status?: string; is_test?: boolean } = {}) =>
     request<Page<OrderSummary>>(`/admin/orders${qs({ ...params, limit: 200 })}`),
   order: (orderId: number) => request<OrderDetail>(`/admin/orders/${orderId}`),
+  orderCandidates: (orderId: number) =>
+    request<CandidateRider[]>(`/admin/orders/${orderId}/candidate-riders`),
+  assignOrder: (orderId: number, body: AssignOrderPayload) =>
+    request<OrderDetail>(`/admin/orders/${orderId}/assign`, { method: 'POST', body }),
+  setOrderExternalStatus: (orderId: number, status: ExternalDeliveryStatus) =>
+    request<OrderDetail>(`/admin/orders/${orderId}/external-status`, { method: 'POST', body: { status } }),
   issues: (status?: string) => request<Page<DeliveryIssue>>(`/admin/issues${qs({ status, limit: 200 })}`),
   addIssueNote: (issueId: number, note: string) =>
     request<DeliveryIssue>(`/admin/issues/${issueId}/note`, { method: 'POST', body: { note } }),

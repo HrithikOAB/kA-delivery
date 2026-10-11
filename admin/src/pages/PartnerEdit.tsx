@@ -65,7 +65,7 @@ function buildForm(p: PartnerDetail): PartnerUpdatePayload {
     email: p.email ?? p.contact_email ?? '',
     emergency_contact: p.emergency_contact,
     operating_hub: p.operating_hub,
-    fleet_tier: p.fleet_tier,
+    fleet_tier: p.fleet_tier ?? '',
     bank_name: p.bank_name,
     bank_account_masked: p.bank_account_masked,
     ifsc_code: p.ifsc_code,
@@ -322,7 +322,7 @@ export function PartnerEdit() {
                         <span className="pe-verified">Verified</span>
                       </div>
                     </div>
-                    <div className="pe-field-row"><label>Fuel Type</label><select value={p.vehicle_fuel_type} onChange={() => {}}><option>Petrol</option><option>Electric</option><option>CNG</option></select></div>
+                    <div className="pe-field-row"><label>Fuel Type</label><select value={p.vehicle_fuel_type ?? ''} onChange={() => {}}><option value="">—</option><option>Petrol</option><option>Electric</option><option>CNG</option></select></div>
                     <div className="pe-field-row"><label>Operating Hub</label><input value={form.operating_hub ?? ''} onChange={(e) => set('operating_hub', e.target.value)} /></div>
                     <div className="pe-field-row"><label>Partner Fleet Tier</label><input value={form.fleet_tier ?? ''} onChange={(e) => set('fleet_tier', e.target.value)} /></div>
                     <div className="pe-field-row"><label>Driving License No.</label><input value={form.license_number ?? ''} onChange={(e) => set('license_number', e.target.value)} /></div>

@@ -99,7 +99,7 @@ export function WithdrawalDetail() {
                     <div>
                       <div className="partner-name">{d.partner.full_name}</div>
                       <div className="partner-meta">{d.partner.partner_code} · {d.partner.operating_hub}</div>
-                      <div className="partner-meta">★ {d.partner.rating.toFixed(2)} ({d.partner.total_deliveries}+ trips) · Active since {activeSince(d.partner.active_since)}</div>
+                      <div className="partner-meta">★ {d.partner.rating != null ? d.partner.rating.toFixed(2) : '—'} ({d.partner.total_deliveries}+ trips) · Active since {activeSince(d.partner.active_since)}</div>
                       {d.partner.fleet_tier && <span className="wd-tier">{d.partner.fleet_tier}</span>}
                     </div>
                   </div>

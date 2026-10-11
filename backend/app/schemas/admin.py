@@ -128,7 +128,7 @@ class PartnerListItem(BaseModel):
     current_batch_id: int | None = None
     total_deliveries: int = 0
     partner_code: str | None = None
-    rating: float = 5.0
+    rating: float | None = None
     vehicle_type: str = ""
     vehicle_model: str = ""
     vehicle_number: str = ""
@@ -141,6 +141,7 @@ class PartnerListItem(BaseModel):
     last_lng: float | None = None
     location_updated_at: datetime | None = None
     location_is_stale: bool = True
+    last_seen_at: datetime | None = None
 
 
 class AdminDeliveryRow(BaseModel):
@@ -217,16 +218,16 @@ class PartnerUpdateRequest(BaseModel):
 class PartnerDetail(PartnerListItem):
     license_number: str
     correction_reason: str | None = None
-    fleet_tier: str = ""
+    fleet_tier: str | None = None
     bank_name: str = ""
     bank_account_masked: str = ""
     upi_linked: bool = False
     phone_verified: bool = False
-    rc_status: str = "active"
-    documents_valid_until: str = ""
+    rc_status: str | None = None
+    documents_valid_until: str | None = None
     emergency_contact: str = ""
     contact_email: str | None = None
-    vehicle_fuel_type: str = ""
+    vehicle_fuel_type: str | None = None
     shift_preference: str = "Flexible"
     max_active_orders: int = 2
     total_earned_cents: int = 0
@@ -261,12 +262,97 @@ class OrderSummaryOut(BaseModel):
     delivery_status: str | None
     total_cents: int
     created_at: datetime
+    fulfillment_type: str = "internal"
+    external_provider: str | None = None
+
+
+class OrderMessInfo(BaseModel):
+    mess_id: int
+    name: str
+    address_text: str
+    lat: float
+    lng: float
+    contact_phone: str = ""
+
+
+class OrderCustomerInfo(BaseModel):
+    name: str
+    phone: str | None = None
+    dropoff_text: str
+    dropoff_lat: float
+    dropoff_lng: float
+    note: str = ""
+
+
+class OrderItemLine(BaseModel):
+    name: str
+    unit_price_cents: int
+    quantity: int
+    line_total_cents: int
+
+
+class OrderAssignment(BaseModel):
+    """Current delivery assignment state for an order."""
+
+    rider_id: int | None = None
+    rider_name: str | None = None
+    rider_phone: str | None = None
+    delivery_status: str | None = None
+    batch_status: str | None = None
+    offer_pending: bool = False
+    offered_rider_id: int | None = None
 
 
 class OrderDetailOut(OrderSummaryOut):
     dropoff_text: str
+    # Money breakdown.
+    subtotal_cents: int = 0
+    delivery_fee_cents: int = 0
+    tax_cents: int = 0
+    payment_status: str = "pending"
+    payment_method: str = "cod"
+    # Fulfillment / external courier.
+    external_reference: str | None = None
+    external_note: str | None = None
+    external_status: str | None = None
+    source: str = "customer"
+    # Nested detail.
+    mess: OrderMessInfo | None = None
+    customer: OrderCustomerInfo | None = None
+    items: list[OrderItemLine] = []
+    assignment: OrderAssignment | None = None
     timeline: list[AuditEventOut] = []
     issues: list["DeliveryIssueOut"] = []
+
+
+class CandidateRiderOut(BaseModel):
+    rider_id: int
+    full_name: str
+    phone: str | None = None
+    is_online: bool
+    rating: float | None = None
+    vehicle_type: str = ""
+    distance_km: float | None = None
+    location_is_stale: bool = True
+    active_order_id: int | None = None
+    active_mess_id: int | None = None
+    # False when the rider is busy with an order from a *different* mess.
+    available: bool = True
+    unavailable_reason: str | None = None
+
+
+class AssignOrderRequest(BaseModel):
+    mode: str = Field(pattern="^(internal|external)$")
+    # internal
+    rider_id: int | None = None
+    # external
+    provider: str | None = Field(default=None, pattern="^(zomato|swiggy|other)$")
+    reference: str | None = Field(default=None, max_length=128)
+    note: str | None = Field(default=None, max_length=512)
+
+
+class ExternalStatusRequest(BaseModel):
+    status: str = Field(pattern="^(assigned|picked_up|delivered|cancelled)$")
 
 
 class NoteRequest(BaseModel):
@@ -333,7 +419,7 @@ class WithdrawalRequestOut(BaseModel):
     rider_name: str
     partner_code: str | None = None
     fleet_tier: str = ""
-    rating: float = 5.0
+    rating: float | None = None
     amount_cents: int
     fee_cents: int = 0
     net_amount_cents: int
@@ -388,7 +474,7 @@ class WithdrawalPartnerOut(BaseModel):
     full_name: str
     partner_code: str | None = None
     operating_hub: str = ""
-    rating: float = 5.0
+    rating: float | None = None
     total_deliveries: int = 0
     active_since: datetime | None = None
     fleet_tier: str = ""

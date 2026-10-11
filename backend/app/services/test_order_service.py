@@ -170,48 +170,16 @@ def assign_to_rider(db: Session, order_id: int, admin: User, rider_id: int) -> O
     flow (no dispatch mechanism is invented). Drives the order to ``ready`` first
     if needed so a batch exists.
     """
+    from app.services import order_admin_service
+
     order = _test_order(db, order_id)
     rider = db.get(User, rider_id)
     if rider is None or rider.rider_profile is None or not rider.rider_profile.is_approved:
         raise HTTPException(status_code=400, detail="Choose an approved partner")
 
-    # Ensure the order is batched (advance through the pipeline if still early).
-    try:
-        while order.status in (OrderStatus.placed, OrderStatus.accepted, OrderStatus.preparing):
-            nxt = {
-                OrderStatus.placed: OrderStatus.accepted,
-                OrderStatus.accepted: OrderStatus.preparing,
-                OrderStatus.preparing: OrderStatus.ready,
-            }[order.status]
-            state_machine.transition_order(db, order, nxt, actor_user_id=admin.id)
-    except InvalidTransition as exc:
-        raise HTTPException(status_code=409, detail=str(exc))
-
-    batch = dispatch_service.ensure_batch_for_ready_order(db, order)
-    if batch.rider_id is not None and batch.rider_id != rider.id:
-        raise HTTPException(status_code=409, detail="Delivery is already assigned to another partner")
-
-    # Exclusive-offer policy: do not yank a live offer from a different partner.
-    # They must respond (or the offer must lapse/reject) before re-offering.
-    if any(
-        off.status == OfferStatus.sent and off.rider_id != rider.id
-        for off in batch.offers
-    ):
-        raise HTTPException(
-            status_code=409,
-            detail="This delivery is already offered to another partner. Wait for them to respond, or cancel that offer first.",
-        )
-
-    # Clear any prior open offers for this batch, then offer to the chosen rider.
-    for off in list(batch.offers):
-        if off.status == OfferStatus.sent:
-            off.status = OfferStatus.expired
-            off.responded_at = utcnow()
-    dispatch_service.create_offer(db, batch, rider)
-    audit_service.record(
-        db, actor_user_id=admin.id, action="test_order_assigned",
-        target_type="order", target_id=order.id, order_id=order.id,
-        detail=f"offered to rider {rider.id}",
+    # Shared offer flow (advance to ready, guard live offers, create the offer).
+    order_admin_service.offer_order_to_rider(
+        db, order, rider, actor_user_id=admin.id, audit_action="test_order_assigned"
     )
     db.commit()
     manager.publish(order.id)

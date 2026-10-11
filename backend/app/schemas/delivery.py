@@ -34,12 +34,12 @@ class DeliveryStop(BaseModel):
     customer_note: str = ""
     customer_phone: str = ""
     customer_verified: bool = False
-    eta_minutes: int = 0
-    distance_remaining_km: float = 0
-    route_label: str = ""
-    deliver_by_label: str = ""
+    eta_minutes: int | None = None
+    distance_remaining_km: float | None = None
+    route_label: str | None = None
+    deliver_by_label: str | None = None
     arrived_at_drop: bool = False
-    helper_text: str = ""
+    helper_text: str | None = None
 
 
 class OfferOut(BaseModel):
@@ -150,14 +150,14 @@ class RiderDashboardOut(BaseModel):
 class ActiveDeliveryMetaOut(BaseModel):
     phase: str
     status_label: str
-    eta_minutes: int
-    distance_remaining_km: float
-    route_label: str
-    deliver_by_label: str
+    eta_minutes: int | None = None
+    distance_remaining_km: float | None = None
+    route_label: str | None = None
+    deliver_by_label: str | None = None
     rider_lat: float | None = None
     rider_lng: float | None = None
     arrived_at_drop: bool = False
-    helper_text: str = ""
+    helper_text: str | None = None
 
 
 class BatchOut(BaseModel):

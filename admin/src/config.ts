@@ -21,6 +21,8 @@ export const config = {
   mapCenter: [Number.isFinite(center[0]) ? center[0] : 18.5204, Number.isFinite(center[1]) ? center[1] : 73.8567] as [number, number],
   mapZoom: Number(import.meta.env.VITE_MAP_ZOOM ?? 12),
   googleMapsKey,
+  /** Enables the developer API inspector (also requires a super_admin login). */
+  showApiInspector: String(import.meta.env.VITE_SHOW_API_INSPECTOR ?? '').toLowerCase() === 'true',
 };
 
 export const hasGoogleMaps = googleMapsKey.length > 0;

@@ -21,8 +21,10 @@ class Mess(Base, TimestampMixin):
     lat: Mapped[float] = mapped_column(Float)
     lng: Mapped[float] = mapped_column(Float)
     is_open: Mapped[bool] = mapped_column(Boolean, default=True)
-    rating: Mapped[float] = mapped_column(Float, default=4.5)
-    delivery_fee_cents: Mapped[int] = mapped_column(Integer, default=2000)
+    # No fabricated rating; NULL until the mess earns real reviews. Delivery fee
+    # is NULL until the mess owner configures it (treated as 0 at pricing time).
+    rating: Mapped[float | None] = mapped_column(Float, nullable=True)
+    delivery_fee_cents: Mapped[int | None] = mapped_column(Integer, nullable=True)
     # Pickup point created by the admin test-order tool (not a real kitchen).
     is_test: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
     is_pure_veg: Mapped[bool] = mapped_column(Boolean, default=False)

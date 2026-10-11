@@ -15,6 +15,7 @@ from app.api.v1 import (
     admin,
     auth,
     deliveries,
+    integration,
     maps,
     mess_ops,
     messes,
@@ -69,6 +70,7 @@ api.include_router(addresses.router)
 api.include_router(orders.router)
 api.include_router(mess_ops.router)
 api.include_router(admin.router)
+api.include_router(integration.router)
 api.include_router(tracking_ws.router)
 
 

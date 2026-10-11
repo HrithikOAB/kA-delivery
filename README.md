@@ -100,7 +100,7 @@ Admins, riders and mess owners sign in with **email + password** (`password123`)
 
 | Role     | Email                    | Notes                                        |
 |----------|--------------------------|----------------------------------------------|
-| Admin    | `admin@digimess.app`     | Super admin (all permissions)                |
+| Admin    | `admin@kadelivery.app`     | Super admin (all permissions)                |
 | Admin    | `verifier@digimess.app`  | Partner-verification tier                    |
 | Admin    | `ops@digimess.app`       | Operations tier (test orders, live map)      |
 | Rider    | `rider@digimess.app`     | Approved; can go online                      |
@@ -115,7 +115,7 @@ Admins, riders and mess owners sign in with **email + password** (`password123`)
 
 This is the primary golden path for the delivery-partner platform:
 
-1. **Admin** (`admin@digimess.app`) signs in to the dashboard → **Partner
+1. **Admin** (`admin@kadelivery.app`) signs in to the dashboard → **Partner
    verification** → open `applicant@digimess.app` → review documents → **Approve**.
 2. On mobile, the approved **partner** signs in and taps **ONLINE**.
    (New applicants upload documents under **Manage documents & verification**.)

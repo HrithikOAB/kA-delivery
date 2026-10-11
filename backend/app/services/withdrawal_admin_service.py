@@ -82,7 +82,7 @@ def _enrich_txn(db: Session, txn: WalletTransaction) -> dict:
         "rider_name": user.full_name if user else "Partner",
         "partner_code": partner_code,
         "fleet_tier": profile.fleet_tier if profile else "",
-        "rating": round(float(profile.rating if profile else 5.0), 2),
+        "rating": (round(float(profile.rating), 2) if profile and profile.rating is not None else None),
         "amount_cents": amount,
         "fee_cents": txn.fee_cents,
         "net_amount_cents": max(0, amount - txn.fee_cents),

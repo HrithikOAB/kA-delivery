@@ -24,8 +24,9 @@ class WalletTransaction(Base, TimestampMixin):
     order_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     fee_cents: Mapped[int] = mapped_column(Integer, default=0)
     admin_note: Mapped[str | None] = mapped_column(String(500), nullable=True)
-    risk_score: Mapped[int] = mapped_column(Integer, default=95)
-    risk_label: Mapped[str] = mapped_column(String(64), default="Low Risk")
+    # Risk is an assessment output, not a given — NULL until a real check runs.
+    risk_score: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    risk_label: Mapped[str | None] = mapped_column(String(64), nullable=True)
     payout_cycle: Mapped[str | None] = mapped_column(String(32), nullable=True)
     reviewed_by_user_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     reviewed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)

@@ -1,11 +1,14 @@
 """Shared FastAPI dependencies: auth, current user, and role guards."""
 from __future__ import annotations
 
+import secrets
+
 import jwt
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, Header, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
+from app.config import settings
 from app.core.security import decode_access_token
 from app.database import get_db
 from app.models.enums import AdminRole, ApprovalStatus, UserRole
@@ -93,6 +96,25 @@ def require_admin_permission(*allowed: AdminRole):
         )
 
     return _guard
+
+
+def require_integration_key(x_api_key: str | None = Header(default=None)) -> None:
+    """Server-to-server guard for the booking-app ingestion endpoint.
+
+    Ingestion is disabled (503) until ``INTEGRATION_API_KEY`` is configured, so
+    the endpoint is never open by default. The comparison is constant-time.
+    """
+    expected = settings.integration_api_key
+    if not expected:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Order ingestion is not configured",
+        )
+    if not x_api_key or not secrets.compare_digest(x_api_key, expected):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or missing API key",
+        )
 
 
 # Convenience singletons.

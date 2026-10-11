@@ -55,6 +55,27 @@ class Order(Base, TimestampMixin):
     )
     payment_method: Mapped[str] = mapped_column(String(24), default="cod")
 
+    # Origin of the order. Real customer orders come from the booking app; the
+    # legacy value "customer" covers the in-repo checkout flow and test tool.
+    source: Mapped[str] = mapped_column(String(24), default="customer", index=True)
+    # Booking-app order id — makes ingestion idempotent (re-POST returns the same
+    # order instead of duplicating). Null for orders not created via ingestion.
+    external_order_ref: Mapped[str | None] = mapped_column(
+        String(128), unique=True, index=True, nullable=True
+    )
+
+    # Fulfillment: an in-platform (KA) rider via the dispatch engine, or an
+    # external courier (Zomato/Swiggy/other) tracked manually by ops.
+    fulfillment_type: Mapped[str] = mapped_column(String(16), default="internal", index=True)
+    external_provider: Mapped[str | None] = mapped_column(String(24), nullable=True)
+    external_reference: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    external_note: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    external_status: Mapped[str | None] = mapped_column(String(24), nullable=True)
+    external_assigned_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+    # Contact captured at order time (booking-app customers are placeholder users).
+    customer_phone: Mapped[str | None] = mapped_column(String(32), nullable=True)
+
     # OTP delivery proof.
     otp_code: Mapped[str | None] = mapped_column(String(8), nullable=True)
     otp_expires_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)

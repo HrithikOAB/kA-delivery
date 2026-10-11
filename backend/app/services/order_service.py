@@ -62,7 +62,8 @@ def price_cart(db: Session, mess_id: int, items: list[CartItemIn]) -> CheckoutRe
         raise HTTPException(status_code=404, detail="Mess not found")
     lines, subtotal = _priced_lines(db, mess, items)
     tax = round(subtotal * TAX_RATE)
-    delivery_fee = mess.delivery_fee_cents
+    # Delivery fee is NULL until the mess owner configures one; treat as 0.
+    delivery_fee = mess.delivery_fee_cents or 0
     total = subtotal + tax + delivery_fee
     return CheckoutResponse(
         mess_id=mess.id,

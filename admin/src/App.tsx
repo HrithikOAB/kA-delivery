@@ -10,6 +10,7 @@ import { PartnerProfile } from '@/pages/PartnerProfile';
 import { PartnerEdit } from '@/pages/PartnerEdit';
 import { Operations } from '@/pages/Operations';
 import { Orders } from '@/pages/Orders';
+import { OrderDetailPage } from '@/pages/OrderDetail';
 import { TestOrders } from '@/pages/TestOrders';
 import { Placeholder } from '@/pages/Placeholder';
 import { Withdrawals } from '@/pages/Withdrawals';
@@ -36,6 +37,7 @@ export function App() {
       >
         <Route path="/" element={<Overview />} />
         <Route path="/orders" element={<Orders />} />
+        <Route path="/orders/:orderId" element={<OrderDetailPage />} />
         <Route path="/partners" element={<Partners />} />
         <Route path="/partners/:riderId/edit" element={<PartnerEdit />} />
         <Route path="/partners/:riderId" element={<PartnerProfile />} />

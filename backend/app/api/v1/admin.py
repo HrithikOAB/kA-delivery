@@ -35,8 +35,11 @@ from app.schemas.admin import (
     FleetLeaderOut,
     ActiveDeliveryOut,
     AdminDeliveryRow,
+    AssignOrderRequest,
     AssignRequest,
     AuditEventOut,
+    CandidateRiderOut,
+    ExternalStatusRequest,
     NoteRequest,
     OrderDetailOut,
     OrderSummaryOut,
@@ -62,6 +65,8 @@ from app.services import (
     audit_service,
     location_service,
     maps_service,
+    order_admin_service,
+    presence_service,
     wallet_service,
     document_service,
     test_order_service,
@@ -320,6 +325,9 @@ def _issue_out(issue: DeliveryIssue) -> DeliveryIssueOut:
 
 @router.get("/overview", response_model=OverviewOut)
 def overview(_: User = Depends(_any_admin), db: Session = Depends(get_db)) -> OverviewOut:
+    # Take force-closed apps offline so the online count reflects reality.
+    presence_service.sweep_stale_online(db)
+
     def count(stmt) -> int:
         return db.execute(stmt).scalar_one()
 
@@ -487,7 +495,7 @@ def _partner_list_item(db: Session, profile: RiderProfile) -> PartnerListItem:
         current_batch_id=_current_batch_id(db, profile.user_id),
         total_deliveries=total,
         partner_code=profile.partner_code,
-        rating=round(float(profile.rating or 5.0), 2),
+        rating=round(float(profile.rating), 2) if profile.rating is not None else None,
         vehicle_type=profile.vehicle_type,
         vehicle_model=profile.vehicle_model or profile.vehicle_type.title(),
         vehicle_number=profile.vehicle_number,
@@ -500,6 +508,7 @@ def _partner_list_item(db: Session, profile: RiderProfile) -> PartnerListItem:
         last_lng=profile.last_lng,
         location_updated_at=latest.server_timestamp if latest else None,
         location_is_stale=location_service.is_stale(latest) if latest else True,
+        last_seen_at=presence_service.last_seen_at(db, profile),
     )
 
 
@@ -513,6 +522,8 @@ def list_partners(
     _: User = Depends(_any_admin),
     db: Session = Depends(get_db),
 ) -> Page[PartnerListItem]:
+    # Reconcile genuine presence before listing/filtering by online status.
+    presence_service.sweep_stale_online(db)
     stmt = select(RiderProfile).join(User, User.id == RiderProfile.user_id)
     count_stmt = select(func.count(RiderProfile.id)).join(
         User, User.id == RiderProfile.user_id
@@ -636,6 +647,8 @@ def _order_summary(db: Session, order: Order) -> OrderSummaryOut:
         rider_name=rider.full_name if rider else None,
         delivery_status=delivery.status.value if delivery else None,
         total_cents=order.total_cents, created_at=order.created_at,
+        fulfillment_type=order.fulfillment_type,
+        external_provider=order.external_provider,
     )
 
 
@@ -670,6 +683,17 @@ def list_orders(
     )
 
 
+def _order_detail_out(db: Session, order: Order) -> OrderDetailOut:
+    payload = order_admin_service.build_order_detail(db, order)
+    payload["timeline"] = [AuditEventOut.model_validate(e) for e in payload["timeline"]]
+    issues = db.execute(
+        select(DeliveryIssue).where(DeliveryIssue.order_id == order.id)
+        .order_by(DeliveryIssue.id.desc())
+    ).scalars().all()
+    payload["issues"] = [_issue_out(i) for i in issues]
+    return OrderDetailOut.model_validate(payload)
+
+
 @router.get("/orders/{order_id}", response_model=OrderDetailOut)
 def order_detail(
     order_id: int, _: User = Depends(_any_admin), db: Session = Depends(get_db)
@@ -677,18 +701,56 @@ def order_detail(
     order = db.get(Order, order_id)
     if order is None:
         raise HTTPException(status_code=404, detail="Order not found")
-    summary = _order_summary(db, order)
-    timeline = audit_service.for_order(db, order_id)
-    issues = db.execute(
-        select(DeliveryIssue).where(DeliveryIssue.order_id == order_id)
-        .order_by(DeliveryIssue.id.desc())
-    ).scalars().all()
-    return OrderDetailOut(
-        **summary.model_dump(),
-        dropoff_text=order.address_text,
-        timeline=[AuditEventOut.model_validate(e) for e in timeline],
-        issues=[_issue_out(i) for i in issues],
-    )
+    return _order_detail_out(db, order)
+
+
+@router.get("/orders/{order_id}/candidate-riders", response_model=list[CandidateRiderOut])
+def order_candidate_riders(
+    order_id: int, _: User = Depends(_ops), db: Session = Depends(get_db)
+) -> list[CandidateRiderOut]:
+    """Approved, online riders ranked nearest-first to the order's mess."""
+    order = db.get(Order, order_id)
+    if order is None:
+        raise HTTPException(status_code=404, detail="Order not found")
+    return [CandidateRiderOut(**c) for c in order_admin_service.candidate_riders(db, order)]
+
+
+@router.post("/orders/{order_id}/assign", response_model=OrderDetailOut)
+def assign_order(
+    order_id: int,
+    data: AssignOrderRequest,
+    admin: User = Depends(_ops),
+    db: Session = Depends(get_db),
+) -> OrderDetailOut:
+    """Assign delivery: a KA partner (offer) or an external platform (record)."""
+    order = db.get(Order, order_id)
+    if order is None:
+        raise HTTPException(status_code=404, detail="Order not found")
+    if data.mode == "internal":
+        if data.rider_id is None:
+            raise HTTPException(status_code=400, detail="rider_id is required")
+        order = order_admin_service.assign_internal(db, order, admin, data.rider_id)
+    else:
+        if not data.provider:
+            raise HTTPException(status_code=400, detail="provider is required")
+        order = order_admin_service.assign_external(
+            db, order, admin, data.provider, data.reference, data.note
+        )
+    return _order_detail_out(db, order)
+
+
+@router.post("/orders/{order_id}/external-status", response_model=OrderDetailOut)
+def set_order_external_status(
+    order_id: int,
+    data: ExternalStatusRequest,
+    admin: User = Depends(_ops),
+    db: Session = Depends(get_db),
+) -> OrderDetailOut:
+    order = db.get(Order, order_id)
+    if order is None:
+        raise HTTPException(status_code=404, detail="Order not found")
+    order = order_admin_service.update_external_status(db, order, admin, data.status)
+    return _order_detail_out(db, order)
 
 
 @router.get("/issues", response_model=Page[DeliveryIssueOut])
