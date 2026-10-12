@@ -43,12 +43,14 @@ class TrackingSnapshot(BaseModel):
     is_trackable: bool
     updated_at: datetime
 
-    mess_name: str
-    mess_lat: float
-    mess_lng: float
-    dropoff_lat: float
-    dropoff_lng: float
-    dropoff_text: str
+    # Null until the order is assigned (mess/drop-off are cached at assignment);
+    # drop-off coordinates can stay null when the external API lacks them.
+    mess_name: str | None = None
+    mess_lat: float | None = None
+    mess_lng: float | None = None
+    dropoff_lat: float | None = None
+    dropoff_lng: float | None = None
+    dropoff_text: str | None = None
 
     rider_name: str | None = None
     rider_phone: str | None = None

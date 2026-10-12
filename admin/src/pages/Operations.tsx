@@ -37,6 +37,15 @@ function isTransitPhase(status: string) {
   return ['picked_up', 'out_for_delivery'].includes(status);
 }
 
+/** Pickup → rider → drop-off, skipping any point without coordinates. */
+function routePoints(d: ActiveDelivery): [number, number][] {
+  const pts: [number, number][] = [];
+  if (d.pickup_lat != null && d.pickup_lng != null) pts.push([d.pickup_lat, d.pickup_lng]);
+  if (d.rider_marker) pts.push([d.rider_marker.lat, d.rider_marker.lng]);
+  if (d.dropoff_lat != null && d.dropoff_lng != null) pts.push([d.dropoff_lat, d.dropoff_lng]);
+  return pts;
+}
+
 function isCritical(d: ActiveDelivery) {
   return Boolean(d.rider_marker?.is_stale) || (d.eta_minutes != null && d.eta_minutes > 45);
 }
@@ -82,9 +91,6 @@ export function Operations() {
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
 
   const { data: deliveries, loading, error, stale, reload } = useAsync(
-    // Include test orders too — they flow through the real dispatch/tracking
-    // pipeline, so Live Tracking must show them (passing `false` hid every
-    // test delivery, leaving the map and stage filters empty).
     () => api.activeDeliveries(),
     [],
     config.liveTrackingPollMs,
@@ -164,12 +170,7 @@ export function Operations() {
       return;
     }
     if (selDelivery) {
-      const pts: [number, number][] = [[selDelivery.pickup_lat, selDelivery.pickup_lng]];
-      if (selDelivery.rider_marker) {
-        pts.push([selDelivery.rider_marker.lat, selDelivery.rider_marker.lng]);
-      }
-      pts.push([selDelivery.dropoff_lat, selDelivery.dropoff_lng]);
-      setFitSnapshot({ key: effectiveSelectedKey, points: pts });
+      setFitSnapshot({ key: effectiveSelectedKey, points: routePoints(selDelivery) });
       return;
     }
     if (selected.idle && selected.partner?.last_lat != null && selected.partner?.last_lng != null) {
@@ -185,20 +186,24 @@ export function Operations() {
     for (const d of deliveries ?? []) {
       if (!visibleOrderIds.has(d.order_id)) continue;
       const isSel = selDelivery?.order_id === d.order_id;
-      list.push({
-        id: `pickup-${d.order_id}`,
-        lat: d.pickup_lat,
-        lng: d.pickup_lng,
-        label: d.pickup_label ?? 'Pickup',
-        kind: 'pickup',
-      });
-      list.push({
-        id: `drop-${d.order_id}`,
-        lat: d.dropoff_lat,
-        lng: d.dropoff_lng,
-        label: d.dropoff_text,
-        kind: 'dropoff',
-      });
+      if (d.pickup_lat != null && d.pickup_lng != null) {
+        list.push({
+          id: `pickup-${d.order_id}`,
+          lat: d.pickup_lat,
+          lng: d.pickup_lng,
+          label: d.pickup_label ?? 'Pickup',
+          kind: 'pickup',
+        });
+      }
+      if (d.dropoff_lat != null && d.dropoff_lng != null) {
+        list.push({
+          id: `drop-${d.order_id}`,
+          lat: d.dropoff_lat,
+          lng: d.dropoff_lng,
+          label: d.dropoff_text ?? 'Drop-off',
+          kind: 'dropoff',
+        });
+      }
       if (d.rider_marker) {
         list.push({
           id: `rider-${d.order_id}`,
@@ -231,12 +236,7 @@ export function Operations() {
 
   const route = useMemo(() => {
     if (!selDelivery) return undefined;
-    const pts: [number, number][] = [[selDelivery.pickup_lat, selDelivery.pickup_lng]];
-    if (selDelivery.rider_marker) {
-      pts.push([selDelivery.rider_marker.lat, selDelivery.rider_marker.lng]);
-    }
-    pts.push([selDelivery.dropoff_lat, selDelivery.dropoff_lng]);
-    return pts;
+    return routePoints(selDelivery);
   }, [selDelivery]);
 
   const mapFit = useMemo(() => {

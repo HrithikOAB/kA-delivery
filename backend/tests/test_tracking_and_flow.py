@@ -48,7 +48,7 @@ def test_location_allowed_while_online_without_delivery(client, rider_token):
 
 def test_rider_cannot_complete_another_riders_delivery(client, rider_token):
     ids = drive_to_out_for_delivery(client, rider_token)
-    combo_rider = login(client, "rider", "combo@digimess.app")
+    combo_rider = login(client, "rider", "rider2@digimess.app")
     resp = client.post(
         f"/api/v1/deliveries/{ids['delivery_id']}/complete",
         headers=_auth(combo_rider),
@@ -85,7 +85,7 @@ def test_end_to_end_delivery_and_earnings(client, rider_token):
 def test_dispatch_retries_when_rider_goes_online(client, rider_token):
     resp = client.post("/api/v1/rider/offline", headers=_auth(rider_token))
     assert resp.status_code == 204, resp.text
-    combo_token = login(client, "rider", "combo@digimess.app")
+    combo_token = login(client, "rider", "rider2@digimess.app")
     resp = client.post("/api/v1/rider/offline", headers=_auth(combo_token))
     assert resp.status_code == 204, resp.text
 

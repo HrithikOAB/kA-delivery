@@ -62,7 +62,10 @@ export default function ActiveDelivery() {
     [batch],
   );
   const dropPoint = useMemo(
-    () => (nextStop ? { lat: nextStop.address_lat, lng: nextStop.address_lng } : null),
+    () =>
+      nextStop?.address_lat != null && nextStop.address_lng != null
+        ? { lat: nextStop.address_lat, lng: nextStop.address_lng }
+        : null,
     [nextStop],
   );
   const liveRiderPosition = useRiderPosition();
@@ -83,13 +86,15 @@ export default function ActiveDelivery() {
   const { route } = useDirectionsRoute(routeOrigin, dropPoint, !!routeOrigin && !!dropPoint);
 
   const markers: TrackerMarker[] = useMemo(() => {
-    if (!batch || !dropPoint || !nextStop) return [];
+    if (!batch || !nextStop) return [];
     const list: TrackerMarker[] = [];
     if (riderPoint) {
       list.push({ lat: riderPoint.lat, lng: riderPoint.lng, label: 'You', kind: 'rider' });
     }
-    const dropLabel = nextStop.address_title || nextStop.customer_name || 'Drop-off';
-    list.push({ lat: dropPoint.lat, lng: dropPoint.lng, label: dropLabel, kind: 'dropoff' });
+    if (dropPoint) {
+      const dropLabel = nextStop.address_title || nextStop.customer_name || 'Drop-off';
+      list.push({ lat: dropPoint.lat, lng: dropPoint.lng, label: dropLabel, kind: 'dropoff' });
+    }
     return list;
   }, [batch, dropPoint, nextStop, riderPoint]);
 

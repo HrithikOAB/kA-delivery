@@ -1,8 +1,5 @@
-"""Tests for admin auth/permissions, partner verification, the admin-only
-test-order tool (incl. side-effect safeguards), and admin tracking access."""
+"""Tests for admin auth/permissions, partner verification, and admin tracking access."""
 from __future__ import annotations
-
-from sqlalchemy import select
 
 from tests.conftest import _auth, login
 
@@ -32,10 +29,10 @@ def test_permission_tiers_enforced(client):
     # operations-tier admin may not touch the verification queue…
     ops = login(client, "admin", "ops@digimess.app")
     assert client.get("/api/v1/admin/applications", headers=_auth(ops)).status_code == 403
-    # …and the verification-tier admin may not create test orders.
+    # …and the verification-tier admin may not assign deliveries.
     verifier = login(client, "admin", "verifier@digimess.app")
-    body = _test_body()
-    assert client.post("/api/v1/admin/test-orders", headers=_auth(verifier), json=body).status_code == 403
+    body = {"mode": "internal", "rider_id": 1}
+    assert client.post("/api/v1/admin/orders/1/assign", headers=_auth(verifier), json=body).status_code == 403
 
 
 # --- Partner verification -------------------------------------------------
@@ -103,64 +100,7 @@ def test_document_upload_and_admin_can_fetch(client):
     assert got.headers["content-type"].startswith("image/png")
 
 
-# --- Test-order tool ------------------------------------------------------
-
-def _test_body() -> dict:
-    return {
-        "pickup_label": "QA Kitchen", "pickup_lat": 18.5204, "pickup_lng": 73.8567,
-        "dropoff_label": "QA Home", "dropoff_lat": 18.5310, "dropoff_lng": 73.8446,
-        "customer_name": "QA Bot",
-    }
-
-
-def test_test_order_full_flow_and_no_side_effects(client):
-    from app.services import notification_service
-
-    admin = admin_token(client)
-    rtok = login(client, "rider", "rider@digimess.app")
-    client.post("/api/v1/rider/online", headers=_auth(rtok))
-
-    notification_service.provider.sent.clear()  # type: ignore[attr-defined]
-    created = client.post("/api/v1/admin/test-orders", headers=_auth(admin), json=_test_body())
-    assert created.status_code == 201
-    order = created.json()
-    assert order["is_test"] is True
-    oid, otp = order["order_id"], order["otp_code"]
-
-    for step in ("accept", "prepare", "ready"):
-        r = client.post(f"/api/v1/admin/test-orders/{oid}/advance", headers=_auth(admin), params={"to": step})
-        assert r.status_code == 200, r.text
-
-    # Rider (auto-assigned) picks up and completes with the OTP.
-    batch = client.get("/api/v1/rider/active", headers=_auth(rtok)).json()
-    did = batch["stops"][0]["delivery_id"]
-    assert client.post(f"/api/v1/deliveries/{did}/pickup", headers=_auth(rtok)).status_code == 200
-    done = client.post(f"/api/v1/deliveries/{did}/complete", headers=_auth(rtok), json={"otp": otp})
-    assert done.status_code == 200
-
-    # Safeguards: no customer notifications and no payment captured for a test order.
-    assert len(notification_service.provider.sent) == 0  # type: ignore[attr-defined]
-    from app.database import SessionLocal
-    from app.models.order import Order
-    with SessionLocal() as db:
-        o = db.get(Order, oid)
-        assert o.is_test is True
-        assert o.payment_status.value == "pending"
-        assert o.status.value == "delivered"
-
-
-def test_test_order_only_operates_on_test_orders(client):
-    """Admin test-tool endpoints must refuse real customer orders."""
-    from tests.helpers import place_order
-
-    admin = admin_token(client)
-    real = place_order()  # a normal (non-test) order
-    resp = client.post(
-        f"/api/v1/admin/test-orders/{real['id']}/advance",
-        headers=_auth(admin), params={"to": "accept"},
-    )
-    assert resp.status_code == 403
-
+# --- Admin tracking -------------------------------------------------------
 
 def test_admin_active_deliveries_and_tracking(client):
     from tests.helpers import drive_to_out_for_delivery

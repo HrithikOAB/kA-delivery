@@ -148,22 +148,6 @@ export function RiderLoginForm() {
           <Text style={styles.helpText}>Trouble signing in? Contact Partner Helpdesk</Text>
         </Pressable>
 
-        <View style={styles.testimonial}>
-          <View style={styles.testimonialAvatar}>
-            <Text style={styles.testimonialEmoji}>🧑‍🍳</Text>
-          </View>
-          <View style={styles.testimonialBody}>
-            <Text style={styles.testimonialTitle}>Earned ₹2,400 today in 6 hours!</Text>
-            <View style={styles.testimonialMeta}>
-              <Text style={styles.testimonialSub}>Ramesh K. • Top Fleet Partner</Text>
-              <View style={styles.ratingPill}>
-                <Ionicons name="star" size={12} color={colors.tertiary} />
-                <Text style={styles.ratingText}>4.9</Text>
-              </View>
-            </View>
-          </View>
-        </View>
-
         <Text style={styles.legal}>
           By continuing, you agree to the{' '}
           <Text style={styles.legalLink}>Terms of Service</Text>

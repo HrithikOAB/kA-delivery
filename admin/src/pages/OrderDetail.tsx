@@ -23,17 +23,16 @@ export function OrderDetailPage() {
 
   if (Number.isNaN(id)) return <Page title="Order" action={back}><p className="muted">Invalid order id.</p></Page>;
 
-  const markers: MapMarker[] = o
-    ? [
-        ...(o.mess ? [{ lat: o.mess.lat, lng: o.mess.lng, kind: 'pickup' as const, label: o.mess.name }] : []),
-        ...(o.customer ? [{ lat: o.customer.dropoff_lat, lng: o.customer.dropoff_lng, kind: 'dropoff' as const, label: 'Drop-off' }] : []),
-      ]
-    : [];
+  // The external API can omit coordinates (customer location is often null).
+  const pickup = o?.mess && o.mess.lat != null && o.mess.lng != null ? { lat: o.mess.lat, lng: o.mess.lng } : null;
+  const dropoff = o?.customer && o.customer.dropoff_lat != null && o.customer.dropoff_lng != null
+    ? { lat: o.customer.dropoff_lat, lng: o.customer.dropoff_lng }
+    : null;
+  const markers: MapMarker[] = [
+    ...(pickup ? [{ ...pickup, kind: 'pickup' as const, label: o?.mess?.name ?? 'Pickup' }] : []),
+    ...(dropoff ? [{ ...dropoff, kind: 'dropoff' as const, label: 'Drop-off' }] : []),
+  ];
   const fitPoints: [number, number][] = markers.map((m) => [m.lat, m.lng]);
-
-  // Pickup (mess) → drop-off (customer) for the route line.
-  const pickup = o?.mess ? { lat: o.mess.lat, lng: o.mess.lng } : null;
-  const dropoff = o?.customer ? { lat: o.customer.dropoff_lat, lng: o.customer.dropoff_lng } : null;
   const straightLine = useMemo<[number, number][]>(
     () => (pickup && dropoff ? [[pickup.lat, pickup.lng], [dropoff.lat, dropoff.lng]] : []),
     [pickup?.lat, pickup?.lng, dropoff?.lat, dropoff?.lng],
@@ -60,18 +59,26 @@ export function OrderDetailPage() {
 
   return (
     <Page
-      title={o ? `Order #${o.order_id}` : `Order #${id}`}
+      title={o ? (o.external_order_ref ?? `Order #${o.order_id}`) : 'Order'}
       action={back}
     >
       {err && <div className="card" style={{ background: '#fee2e2', marginBottom: 12 }}>{err}</div>}
       {!o ? <p>Loading…</p> : (
         <>
+          {o.external_error && (
+            <div className="card" style={{ background: '#fef3c7', marginBottom: 12, fontSize: 13 }}>
+              Could not load order details from the external order API: {o.external_error}. Showing what is stored locally.
+            </div>
+          )}
           <div className="pageheader" style={{ marginBottom: 12 }}>
             <div>
-              {o.is_test && <span className="badge test">TEST</span>}{' '}
               <span className="muted">{o.status}{o.delivery_status ? ` / ${o.delivery_status}` : ''}</span>
+              {o.external_order_status && <>{' '}<span className="badge">{o.external_order_status}</span></>}
             </div>
-            <span className="muted">{new Date(o.created_at).toLocaleString()}</span>
+            <span className="muted">
+              {o.placed_at ? `Placed ${new Date(o.placed_at).toLocaleString()} · ` : ''}
+              Received {new Date(o.created_at).toLocaleString()}
+            </span>
           </div>
 
           {markers.length > 0 && (
@@ -88,7 +95,7 @@ export function OrderDetailPage() {
                   <div><strong>{o.mess.name}</strong></div>
                   <div className="muted">{o.mess.address_text || '—'}</div>
                   {o.mess.contact_phone && <div>☎ {o.mess.contact_phone}</div>}
-                  <div className="muted" style={{ fontSize: 11 }}>{o.mess.lat.toFixed(5)}, {o.mess.lng.toFixed(5)}</div>
+                  {pickup && <div className="muted" style={{ fontSize: 11 }}>{pickup.lat.toFixed(5)}, {pickup.lng.toFixed(5)}</div>}
                 </div>
               ) : <p className="muted">—</p>}
             </div>
@@ -98,7 +105,8 @@ export function OrderDetailPage() {
                 <div style={{ fontSize: 13 }}>
                   <div><strong>{o.customer.name || '—'}</strong></div>
                   {o.customer.phone && <div>☎ {o.customer.phone}</div>}
-                  <div className="muted">{o.customer.dropoff_text}</div>
+                  <div className="muted">{o.customer.dropoff_text || 'No address provided'}</div>
+                  {!dropoff && <div className="muted" style={{ fontSize: 11 }}>No drop-off coordinates</div>}
                   {o.customer.note && <div style={{ marginTop: 4 }}>Note: {o.customer.note}</div>}
                 </div>
               ) : <p className="muted">—</p>}
@@ -111,15 +119,23 @@ export function OrderDetailPage() {
               <thead><tr><th>Item</th><th>Qty</th><th style={{ textAlign: 'right' }}>Line</th></tr></thead>
               <tbody>
                 {o.items.map((it, i) => (
-                  <tr key={i}><td>{it.name}</td><td>× {it.quantity}</td><td style={{ textAlign: 'right' }}>{money(it.line_total_cents)}</td></tr>
+                  <tr key={i}>
+                    <td>{it.name}{it.food_type && <div className="muted" style={{ fontSize: 11 }}>{it.food_type}</div>}</td>
+                    <td>× {it.quantity}</td>
+                    <td style={{ textAlign: 'right' }}>{money(it.line_total_cents)}</td>
+                  </tr>
                 ))}
                 {o.items.length === 0 && <tr><td colSpan={3} className="muted">No line items</td></tr>}
               </tbody>
             </table>
           </div>
           <div style={{ fontSize: 13, marginTop: 6, textAlign: 'right' }}>
-            <div className="muted">Subtotal {money(o.subtotal_cents)} · Delivery {money(o.delivery_fee_cents)} · Tax {money(o.tax_cents)}</div>
-            <div><strong>Total {money(o.total_cents)}</strong> · {o.payment_method} ({o.payment_status})</div>
+            <div className="muted">
+              Items {money(o.subtotal_cents)} · Delivery {money(o.delivery_fee_cents)}
+              {o.tax_cents > 0 && <> · Other {money(o.tax_cents)}</>}
+            </div>
+            <div><strong>Total {money(o.total_cents)}</strong> · {o.payment_method || '—'} ({o.payment_status || '—'})</div>
+            {o.amount_to_collect_cents != null && <div className="muted">To collect on delivery: {money(o.amount_to_collect_cents)}</div>}
           </div>
 
           <AssignmentPanel order={o} onChanged={load} />
@@ -164,10 +180,12 @@ const PROVIDERS: { value: ExternalProvider; label: string }[] = [
   { value: 'swiggy', label: 'Swiggy' },
   { value: 'other', label: 'Other' },
 ];
+const BLOCKED_EXTERNAL_STATUSES = ['REJECTED', 'CANCELLED'];
 const EXTERNAL_STEPS: ('assigned' | 'picked_up' | 'delivered')[] = ['assigned', 'picked_up', 'delivered'];
 
 function AssignmentPanel({ order, onChanged }: { order: OrderDetail; onChanged: () => void }) {
   const terminal = order.status === 'delivered' || order.status === 'cancelled';
+  const externallyClosed = BLOCKED_EXTERNAL_STATUSES.includes((order.external_order_status ?? '').toUpperCase());
   const [mode, setMode] = useState<'ka' | 'external'>(order.fulfillment_type === 'external' ? 'external' : 'ka');
   const a = order.assignment;
 
@@ -181,6 +199,8 @@ function AssignmentPanel({ order, onChanged }: { order: OrderDetail; onChanged: 
 
       {terminal ? (
         <p className="muted" style={{ margin: 0 }}>Order is {order.status}; assignment is locked.</p>
+      ) : externallyClosed ? (
+        <p className="muted" style={{ margin: 0 }}>The external platform reports this order as {order.external_order_status}; it cannot be assigned.</p>
       ) : (
         <>
           <div className="row" style={{ marginBottom: 10 }}>

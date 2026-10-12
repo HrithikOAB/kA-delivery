@@ -72,7 +72,7 @@ def _time_label(dt: datetime | None, now: datetime | None = None) -> str:
 def _distance_for(delivery: Delivery, order: Order, mess: Mess | None) -> float | None:
     if delivery.distance_km is not None:
         return round(delivery.distance_km, 1)
-    if mess and order:
+    if mess and order and order.address_lat is not None and order.address_lng is not None:
         return round(haversine_km(mess.lat, mess.lng, order.address_lat, order.address_lng), 1)
     return None
 
@@ -95,11 +95,6 @@ def capture_delivery_metrics(delivery: Delivery, order: Order, mess: Mess | None
     if delivery.picked_up_at and delivery.delivered_at:
         delta = delivery.delivered_at - delivery.picked_up_at
         delivery.active_minutes = max(1, int(delta.total_seconds() // 60))
-    # Demo tip: 10% chance style — use order total mod for stable demo
-    if order.total_cents % 3 == 0:
-        delivery.tip_cents = max(2000, int(order.total_cents * 0.05))
-
-
 def build_history(
     db: Session,
     rider_id: int,
@@ -174,110 +169,3 @@ def build_history(
         },
         "items": items,
     }
-
-
-def seed_demo_history(db: Session, rider_id: int, customer_id: int, default_mess_id: int) -> None:
-    """Populate demo delivery history for the partner app screens."""
-    from sqlalchemy import select
-
-    from app.models.delivery import Delivery, DeliveryBatch
-    from app.models.enums import BatchStatus, DeliveryStatus, OrderStatus, PaymentStatus, PayoutStatus
-    from app.models.mess import Mess
-    from app.models.order import Order
-
-    marker = db.execute(
-        select(Delivery).where(Delivery.rider_id == rider_id, Delivery.order_id == 42)
-    ).scalar_one_or_none()
-    if marker:
-        return
-
-    default_mess = db.get(Mess, default_mess_id)
-    if default_mess is None:
-        return
-
-    def _mess_id(name: str) -> int:
-        if name == default_mess.name:
-            return default_mess.id
-        existing = db.execute(select(Mess).where(Mess.name == name)).scalar_one_or_none()
-        if existing:
-            return existing.id
-        m = Mess(
-            owner_user_id=default_mess.owner_user_id,
-            name=name,
-            description="Demo mess for history",
-            address_text="Bengaluru",
-            lat=default_mess.lat,
-            lng=default_mess.lng,
-            is_open=True,
-            delivery_fee_cents=2000,
-        )
-        db.add(m)
-        db.flush()
-        return m.id
-
-    now = datetime.utcnow()
-    demos = [
-        (42, "Annapoorna Tiffin & South Mess", "Bellandur Tech Zone", 4.8, 18500, 2000, 1.4, 0),
-        (43, "Khana Delivery Kitchen", "HSR Layout Sector 2", 3.2, 17200, 0, 1.0, 1),
-        (44, "Annapoorna Tiffin & South Mess", "Koramangala 5th Block", 5.1, 19800, 1500, 1.25, 2),
-        (45, "South Spice Mess", "Bellandur Tech Zone", 2.4, 15600, 0, 1.0, 3),
-        (46, "Khana Delivery Kitchen", "Indiranagar 100ft Road", 6.2, 21400, 2500, 1.5, 4),
-        (47, "Annapoorna Tiffin & South Mess", "Marathahalli Bridge", 4.0, 18100, 0, 1.2, 5),
-        (48, "South Spice Mess", "HSR Layout Sector 7", 3.6, 16900, 1000, 1.0, 6),
-    ]
-    cancelled = (49, "Khana Delivery Kitchen", "Whitefield ITPL", 3.0, 0, 0, 1.0, 7)
-
-    def _add(order_id, mess_name, area, dist, earn, tip, surge, days_ago, cancelled=False):
-        mid = _mess_id(mess_name)
-        delivered = now - timedelta(days=days_ago, hours=days_ago % 5 + 2)
-        order = Order(
-            id=order_id,
-            customer_id=customer_id,
-            mess_id=mid,
-            status=OrderStatus.cancelled if cancelled else OrderStatus.delivered,
-            is_test=True,
-            test_note="demo-history",
-            address_text=f"Flat 12, {area}, Bengaluru",
-            address_lat=12.9352 + days_ago * 0.002,
-            address_lng=77.6245 + days_ago * 0.001,
-            subtotal_cents=12000,
-            delivery_fee_cents=2000,
-            tax_cents=0,
-            total_cents=14000,
-            payment_status=PaymentStatus.paid,
-            payment_method="cod",
-            placed_at=delivered - timedelta(minutes=45),
-            delivered_at=delivered if not cancelled else None,
-        )
-        db.add(order)
-        db.flush()
-        batch = DeliveryBatch(
-            mess_id=mid,
-            rider_id=rider_id,
-            status=BatchStatus.completed if not cancelled else BatchStatus.cancelled,
-            picked_up_at=delivered - timedelta(minutes=20),
-            completed_at=delivered if not cancelled else None,
-            total_earning_cents=earn,
-        )
-        db.add(batch)
-        db.flush()
-        delivery = Delivery(
-            order_id=order.id,
-            batch_id=batch.id,
-            rider_id=rider_id,
-            status=DeliveryStatus.cancelled if cancelled else DeliveryStatus.delivered,
-            sequence=0,
-            picked_up_at=delivered - timedelta(minutes=20),
-            delivered_at=delivered if not cancelled else None,
-            base_fare_cents=settings.rider_base_fare_cents,
-            earning_cents=earn,
-            tip_cents=tip,
-            surge_multiplier=surge,
-            distance_km=dist,
-            payout_status=PayoutStatus.pending,
-        )
-        db.add(delivery)
-
-    for row in demos:
-        _add(*row)
-    _add(*cancelled, cancelled=True)

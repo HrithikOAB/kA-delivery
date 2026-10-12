@@ -90,6 +90,12 @@ class Settings(BaseSettings):
     # Platform base fare paid to a rider per delivery (real pricing tunable, not
     # a model-level magic default).
     rider_base_fare_cents: int = 9000
+    # Distance pay per km (mess -> drop-off) added to the base fare.
+    rider_per_km_cents: int = 833
+    # Flat fee deducted from each wallet withdrawal.
+    withdrawal_fee_cents: int = 500
+    # Shown on the rider help screen; empty hides the call button.
+    support_phone: str = ""
 
     # --- WebSocket reconnect hints (surfaced to clients) ---
     ws_reconnect_base_ms: int = 1000
@@ -99,9 +105,19 @@ class Settings(BaseSettings):
     notification_provider: str = "dev"
     expo_access_token: str = ""
     payment_provider: str = "cod"
-    # Shared secret the booking app sends (X-API-Key) to the ingestion endpoint.
-    # Empty disables ingestion (endpoint returns 503) so it is never open by default.
+    # Shared secret external partners send (X-API-Key) to the /partner API.
+    # Empty disables that API (endpoints return 503) so it is never open by default.
     integration_api_key: str = ""
+
+    # --- External order API (source of truth for order content) ---
+    external_order_api_url: str = (
+        "https://xy4kr747jd.execute-api.ap-south-1.amazonaws.com/Prod/getRiderOrder"
+    )
+    external_order_api_timeout_seconds: float = 8.0
+    # Credential the external platform issues to us. Sent only when set; for a
+    # bearer token use header "Authorization" and value "Bearer <token>".
+    external_order_api_key: str = ""
+    external_order_api_key_header: str = "x-api-key"
 
     # --- CORS ---
     cors_origins: str = "*"

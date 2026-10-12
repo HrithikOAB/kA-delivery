@@ -15,11 +15,13 @@ class Order(Base, TimestampMixin):
     __tablename__ = "orders"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    customer_id: Mapped[int] = mapped_column(
-        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    # Partner-registered orders start with only ``external_order_ref``; mess,
+    # customer and drop-off are filled from the external order API at assignment.
+    customer_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True, nullable=True
     )
-    mess_id: Mapped[int] = mapped_column(
-        ForeignKey("messes.id", ondelete="CASCADE"), index=True
+    mess_id: Mapped[int | None] = mapped_column(
+        ForeignKey("messes.id", ondelete="CASCADE"), index=True, nullable=True
     )
 
     status: Mapped[OrderStatus] = mapped_column(
@@ -34,9 +36,10 @@ class Order(Base, TimestampMixin):
 
     # Delivery address snapshot (captured at order time; independent of the
     # mutable saved Address row).
-    address_text: Mapped[str] = mapped_column(String(255))
-    address_lat: Mapped[float] = mapped_column(Float)
-    address_lng: Mapped[float] = mapped_column(Float)
+    address_text: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    # The external API may not supply customer coordinates.
+    address_lat: Mapped[float | None] = mapped_column(Float, nullable=True)
+    address_lng: Mapped[float | None] = mapped_column(Float, nullable=True)
 
     address_title: Mapped[str] = mapped_column(String(128), default="")
     address_subtitle: Mapped[str] = mapped_column(String(255), default="")
@@ -63,6 +66,8 @@ class Order(Base, TimestampMixin):
     external_order_ref: Mapped[str | None] = mapped_column(
         String(128), unique=True, index=True, nullable=True
     )
+    # Last ``order_status`` seen from the external order API (e.g. REJECTED).
+    external_order_status: Mapped[str | None] = mapped_column(String(32), nullable=True)
 
     # Fulfillment: an in-platform (KA) rider via the dispatch engine, or an
     # external courier (Zomato/Swiggy/other) tracked manually by ops.

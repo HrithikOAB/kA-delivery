@@ -17,7 +17,8 @@ import type {
   PartnerDetail,
   PartnerUpdatePayload,
   PartnerListItem,
-  TestDelivery,
+  PartnerApiKey,
+  PartnerApiKeySecret,
   Token,
   WithdrawalRequest,
   WithdrawalSummary,
@@ -154,7 +155,7 @@ export const api = {
     request<PartnerDetail>(`/admin/partners/${riderId}/reactivate`, { method: 'POST', body: { reason } }),
 
   // Orders & issues
-  orders: (params: { q?: string; status?: string; is_test?: boolean } = {}) =>
+  orders: (params: { q?: string; status?: string } = {}) =>
     request<Page<OrderSummary>>(`/admin/orders${qs({ ...params, limit: 200 })}`),
   order: (orderId: number) => request<OrderDetail>(`/admin/orders/${orderId}`),
   orderCandidates: (orderId: number) =>
@@ -180,26 +181,14 @@ export const api = {
   bulkApproveWithdrawals: (ids: number[]) =>
     request<{ count: number }>('/admin/withdrawals/bulk-approve', { method: 'POST', body: { ids } }),
 
-  activeDeliveries: (isTest?: boolean) =>
-    request<ActiveDelivery[]>(`/admin/deliveries/active${qs({ is_test: isTest })}`),
+  activeDeliveries: () => request<ActiveDelivery[]>('/admin/deliveries/active'),
 
-  // Test-order tool
-  testOrders: () => request<Page<TestDelivery>>('/admin/test-orders?limit=200'),
-  placeAutocomplete: (input: string) =>
-    request<Array<{ place_id: string; label: string; secondary?: string | null }>>(
-      '/admin/maps/places/autocomplete',
-      { method: 'POST', body: { input } },
-    ),
-  placeDetails: (placeId: string) =>
-    request<{ lat: number; lng: number; label: string; address: string }>(
-      `/admin/maps/places/${encodeURIComponent(placeId)}`,
-    ),
-  createTestOrder: (body: Record<string, unknown>) =>
-    request<TestDelivery>('/admin/test-orders', { method: 'POST', body }),
-  advanceTestOrder: (orderId: number, to: string) =>
-    request<TestDelivery>(`/admin/test-orders/${orderId}/advance${qs({ to })}`, { method: 'POST' }),
-  assignTestOrder: (orderId: number, riderId: number) =>
-    request<TestDelivery>(`/admin/test-orders/${orderId}/assign`, { method: 'POST', body: { rider_id: riderId } }),
-  cancelTestOrder: (orderId: number) =>
-    request<TestDelivery>(`/admin/test-orders/${orderId}/cancel`, { method: 'POST' }),
+  // Partner API keys (super admin)
+  apiKeys: () => request<PartnerApiKey[]>('/admin/api-keys'),
+  createApiKey: (name: string) =>
+    request<PartnerApiKeySecret>('/admin/api-keys', { method: 'POST', body: { name } }),
+  rotateApiKey: (id: number) =>
+    request<PartnerApiKeySecret>(`/admin/api-keys/${id}/rotate`, { method: 'POST' }),
+  revokeApiKey: (id: number) =>
+    request<PartnerApiKey>(`/admin/api-keys/${id}/revoke`, { method: 'POST' }),
 };

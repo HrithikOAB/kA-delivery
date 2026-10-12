@@ -22,12 +22,12 @@ class DeliveryStop(BaseModel):
     sequence: int
     customer_name: str
     address_text: str
-    address_lat: float
-    address_lng: float
+    # Null when the external order API has no customer coordinates.
+    address_lat: float | None = None
+    address_lng: float | None = None
     total_cents: int
     payment_method: str = "cod"
     items: list[RiderOrderItemOut] = []
-    prep_ready_in_minutes: int = 0
     address_title: str = ""
     address_subtitle: str = ""
     address_tag: str = ""
@@ -56,52 +56,24 @@ class OfferOut(BaseModel):
     order_count: int = 0
     base_earning_cents: int = 0
     surge_cents: int = 0
-    incentive_cents: int = 0
     estimated_earning_cents: int = 0
-    is_high_demand: bool = False
     stops: list[DeliveryStop] = []
-
-
-class HotspotOut(BaseModel):
-    mess_id: int
-    mess_name: str
-    lat: float
-    lng: float
-    demand_level: str
-    multiplier: float
-    open_batches: int
-
-
-class IncentiveQuestOut(BaseModel):
-    title: str
-    target_deliveries: int
-    completed_deliveries: int
-    bonus_cents: int
-    ends_at: str
-
-
 
 
 class OfferOrderSummaryOut(BaseModel):
     item_count: int
     item_tags: list[str] = []
-    payment_label: str = "COD"
+    payment_label: str
     is_prepaid: bool = False
-    no_cash_collection: bool = False
 
 
 class OfferDetailOut(OfferOut):
     mess_address: str = ""
-    total_distance_km: float = 0.0
-    estimated_minutes: int = 0
-    route_label: str = ""
-    pickup_distance_km: float = 0.0
-    drop_distance_km: float = 0.0
-    handover_type: str = "doorstep"
-    handover_label: str = "Contactless"
-    bag_count: int = 1
-    bag_size_label: str = "Medium size"
-    is_express: bool = False
+    # Null when the rider's or customer's coordinates are unknown.
+    total_distance_km: float | None = None
+    estimated_minutes: int | None = None
+    pickup_distance_km: float | None = None
+    drop_distance_km: float | None = None
     payout: PayoutBreakdownOut | None = None
     order_summary: OfferOrderSummaryOut | None = None
 
@@ -115,36 +87,10 @@ class LastCompletedOut(BaseModel):
     completed_ago_label: str = ""
 
 
-class SurgeHotspotOut(BaseModel):
-    title: str
-    subtitle: str
-    multiplier: float
-    distance_km: float
-    lat: float
-    lng: float
-    map_label: str
-
-
-class DashboardQuestOut(BaseModel):
-    title: str
-    bonus_cents: int
-    progress_pct: int
-    completed_deliveries: int
-    target_deliveries: int
-    remaining: int
-    ends_label: str
-
 class RiderDashboardOut(BaseModel):
-    hotspots: list[HotspotOut]
-    incentive_quest: IncentiveQuestOut
-    quest: DashboardQuestOut | None = None
     today_deliveries: int
     today_earnings_cents: int
-    earnings_pct_vs_yesterday: float = 0.0
-    online_hours_label: str = "—"
-    tips_cents: int = 0
     last_completed: LastCompletedOut | None = None
-    surge_hotspot: SurgeHotspotOut | None = None
 
 
 class ActiveDeliveryMetaOut(BaseModel):
@@ -183,12 +129,11 @@ class PickupChecklistItemOut(BaseModel):
 
 
 class PickupTrackingOut(BaseModel):
-    eta_minutes: int
-    distance_km: float
-    route_label: str
+    # Null until the rider's location is known.
+    eta_minutes: int | None = None
+    distance_km: float | None = None
     track_status: str
     track_status_label: str
-    progress_pct: int
 
 
 class PickupMerchantOut(BaseModel):
@@ -217,11 +162,10 @@ class PickupDetailOut(BaseModel):
     checklist: list[PickupChecklistItemOut]
     all_verified: bool
     arrived_at_pickup: bool
-    gps_validation_note: str
     rider_lat: float | None = None
     rider_lng: float | None = None
-    drop_lat: float = 0.0
-    drop_lng: float = 0.0
+    drop_lat: float | None = None
+    drop_lng: float | None = None
 
 
 class PickupVerifyItemsRequest(BaseModel):
@@ -298,28 +242,11 @@ class EarningsDailyOut(BaseModel):
 
 
 class EarningsPayoutOut(BaseModel):
-    cycle_label: str
-    cycle_subtitle: str
-    next_date_label: str
+    """Earnings not yet paid out, and where withdrawals go."""
+
     amount_cents: int
     bank_name: str
     bank_account_masked: str
-    bank_verified: bool
-    cashout_fee_cents: int
-
-
-class RiderIncentiveOut(BaseModel):
-    id: int
-    incentive_type: str
-    title: str
-    subtitle: str
-    target_value: int
-    current_value: int
-    bonus_cents: int
-    status: str
-    progress_pct: int
-    trips_remaining: int
-    ends_at: datetime | None = None
 
 
 class RecentDailyEarningOut(BaseModel):
@@ -331,7 +258,6 @@ class RecentDailyEarningOut(BaseModel):
     trips: int
     online_label: str
     tip_cents: int
-    tag: str | None = None
     icon: str = "weekday"
 
 
@@ -341,16 +267,7 @@ class EarningsDetailOut(BaseModel):
     weekly: EarningsWeeklyOut
     daily: EarningsDailyOut
     payout: EarningsPayoutOut
-    incentives: list[RiderIncentiveOut]
     recent_daily: list[RecentDailyEarningOut]
-    active_incentive_count: int
-
-
-class CashoutResultOut(BaseModel):
-    ok: bool
-    amount_cents: int = 0
-    fee_cents: int = 0
-    message: str
 
 
 class PayoutBreakdownOut(BaseModel):
@@ -359,11 +276,8 @@ class PayoutBreakdownOut(BaseModel):
     distance_pay_cents: int
     distance_label: str
     surge_bonus_cents: int
-    surge_multiplier: float | None = None
     surge_label: str | None = None
-    surge_zone: str | None = None
     tip_cents: int
-    tip_customer: str
     total_cents: int
 
 
@@ -374,18 +288,12 @@ class DeliveryCompletionOut(BaseModel):
     status: str
     status_label: str = "DROP-OFF CONFIRMED"
     mess_name: str
-    mess_verified: bool
     dropoff_area: str
     address_text: str
     customer_name: str
     total_earned_cents: int
-    wallet_credited: bool
-    active_minutes: int
-    estimated_minutes: int
-    minutes_faster: int
-    rider_rating: float
-    rating_comment: str
-    distance_km: float
+    active_minutes: int | None = None
+    distance_km: float | None = None
     payout: PayoutBreakdownOut
     pending_stops: int = 0
     route_timeline: list[dict] = []
@@ -398,7 +306,6 @@ class DeliveryHandoverOut(BaseModel):
     phase_label: str
     handover_type: str
     handover_type_label: str
-    priority_note: str
     instructions: str
     customer_name: str
     address_text: str

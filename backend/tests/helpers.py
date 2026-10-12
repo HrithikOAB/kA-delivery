@@ -4,8 +4,6 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 
 from fastapi.testclient import TestClient
-from sqlalchemy import select
-
 from tests.conftest import _auth
 
 CUST_LAT, CUST_LNG = 18.5310, 73.8446
@@ -24,34 +22,95 @@ def _db_session():
     return SessionLocal()
 
 
-def place_order() -> dict:
-    """Create a placed order via internal services (no customer HTTP API)."""
-    from app.models.mess import MenuItem, Mess
-    from app.models.user import User
-    from app.schemas.order import CartItemIn, PlaceOrderRequest
-    from app.services.order_service import create_order
+# External order API stand-in: ``ORD-<n>`` -> payload, or ``"down"`` to simulate
+# an outage. The ``external_orders`` fixture in conftest routes
+# ``external_order_client.fetch_order`` here.
+EXTERNAL_ORDERS: dict[str, dict | str] = {}
+_next_ref = [10000]
 
+
+def external_payload(
+    ref: str,
+    *,
+    mess_name: str,
+    mess_lat: float | None,
+    mess_lng: float | None,
+    customer_lat: float | None = CUST_LAT,
+    customer_lng: float | None = CUST_LNG,
+    customer_phone: str = "+919000000001",
+    order_status: str = "PLACED",
+) -> dict:
+    """Shape of the external getRiderOrder ``data`` object."""
+    return {
+        "customer_details": {
+            "customer_id": "CUS-10",
+            "name": "Jeevan Thul",
+            "location": {"latitude": customer_lat, "longitude": customer_lng},
+            "contact_number": customer_phone,
+            "address": "Flat 4B, Shivaji Nagar",
+            "instruction": "Ring the bell twice",
+        },
+        "mess_details": {
+            "mess_id": "MESS-3",
+            "name": mess_name,
+            "location": {"latitude": mess_lat, "longitude": mess_lng},
+            "contact_number": "9607992777",
+            "address": "Padegaon Road, Aurangabad",
+        },
+        "order_details": {
+            "order_id": ref,
+            "order_items": [
+                {"item_id": "ITEM-3", "name": " Chapati-2 (plate) ", "quantity": 2,
+                 "price": 60, "food_type": "Vegetarian"},
+                {"item_id": "ITEM-4", "name": "Lassi", "quantity": 1, "price": 40,
+                 "food_type": "Vegetarian"},
+            ],
+            "payment_method": "online",
+            "payment_status": "paid",
+            "order_status": order_status,
+            "currency": "INR",
+            "placed_at": "2026-10-07T07:43:03.000Z",
+            "item_total": 160,
+            "delivery_charge": 20,
+            "grand_total": 180,
+            "amount_to_collect": 0,
+            "partner_order_id": None,
+        },
+    }
+
+
+def new_ref() -> str:
+    _next_ref[0] += 1
+    return f"ORD-{_next_ref[0]}"
+
+
+def register_external_order(**overrides) -> str:
+    """Put an order in the fake external API; return its ref."""
+    ref = overrides.pop("ref", None) or new_ref()
+    kwargs = {
+        "mess_name": overrides.pop("mess_name", "Khana Delivery Kitchen"),
+        "mess_lat": overrides.pop("mess_lat", 18.5204),
+        "mess_lng": overrides.pop("mess_lng", 73.8567),
+    }
+    kwargs.update(overrides)
+    EXTERNAL_ORDERS[ref] = external_payload(ref, **kwargs)
+    return ref
+
+
+def place_order() -> dict:
+    """Register an external order id and cache its content (what assignment does)."""
+    from app.models.order import Order
+    from app.services import order_hydration_service, partner_order_service
+
+    ref = register_external_order()
     db = _db_session()
     try:
-        customer = db.execute(
-            select(User).where(User.email == "customer@digimess.app")
-        ).scalar_one()
-        mess = db.execute(select(Mess)).scalars().first()
-        menu_item = db.execute(
-            select(MenuItem).where(MenuItem.mess_id == mess.id)
-        ).scalars().first()
-        req = PlaceOrderRequest(
-            mess_id=mess.id,
-            items=[CartItemIn(menu_item_id=menu_item.id, quantity=2)],
-            address_text="Flat 4B, Shivaji Nagar",
-            address_lat=CUST_LAT,
-            address_lng=CUST_LNG,
-            payment_method="cod",
-        )
-        order = create_order(db, customer, req)
+        out = partner_order_service.register_order(db, ref)
+        order = db.get(Order, out.internal_id)
+        order_hydration_service.hydrate_from_external(db, order)
         db.commit()
         db.refresh(order)
-        return {"id": order.id, "otp_code": order.otp_code}
+        return {"id": order.id, "ref": ref, "otp_code": order.otp_code}
     finally:
         db.close()
 

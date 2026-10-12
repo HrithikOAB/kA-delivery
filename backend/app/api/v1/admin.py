@@ -1,6 +1,6 @@
-"""Admin dashboard API: verification, partners, operations, orders, and the
-admin-only test-order tool. All endpoints require an authenticated admin and are
-further gated by admin permission tier (see ``api/deps``).
+"""Admin dashboard API: verification, partners, operations, and orders. All
+endpoints require an authenticated admin and are further gated by admin
+permission tier (see ``api/deps``).
 """
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ import os
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import FileResponse
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from app.api.deps import require_admin_permission
@@ -36,7 +36,6 @@ from app.schemas.admin import (
     ActiveDeliveryOut,
     AdminDeliveryRow,
     AssignOrderRequest,
-    AssignRequest,
     AuditEventOut,
     CandidateRiderOut,
     ExternalStatusRequest,
@@ -53,8 +52,6 @@ from app.schemas.admin import (
     PartnerListItem,
     ReasonRequest,
     RiderMarkerOut,
-    TestDeliveryCreate,
-    TestDeliveryOut,
     WithdrawalRequestOut,
     WithdrawalSummaryOut,
     WithdrawalDetailOut,
@@ -69,7 +66,6 @@ from app.services import (
     presence_service,
     wallet_service,
     document_service,
-    test_order_service,
     tracking_service,
     verification_service,
     withdrawal_admin_service,
@@ -245,78 +241,6 @@ async def places_details(
     return PlaceDetailsOut(**details)
 
 
-# --- Admin-only test-order tool ------------------------------------------
-
-@router.post("/test-orders", response_model=TestDeliveryOut, status_code=201)
-def create_test_order(
-    data: TestDeliveryCreate,
-    admin: User = Depends(_ops),
-    db: Session = Depends(get_db),
-) -> TestDeliveryOut:
-    """Create a clearly-marked TEST delivery. Appears in the backend as a normal
-    (unassigned) delivery and flows through the real dispatch/tracking pipeline.
-    """
-    order = test_order_service.create_test_delivery(db, admin, data)
-    return test_order_service.to_out(db, order)
-
-
-@router.get("/test-orders", response_model=Page[TestDeliveryOut])
-def list_test_orders(
-    limit: int = Query(default=50, ge=1, le=200),
-    offset: int = Query(default=0, ge=0),
-    _: User = Depends(_ops),
-    db: Session = Depends(get_db),
-) -> Page[TestDeliveryOut]:
-    total = db.execute(
-        select(func.count(Order.id)).where(Order.is_test.is_(True))
-    ).scalar_one()
-    orders = db.execute(
-        select(Order)
-        .where(Order.is_test.is_(True))
-        .order_by(Order.id.desc())
-        .limit(limit)
-        .offset(offset)
-    ).scalars().all()
-    return Page(
-        items=[test_order_service.to_out(db, o) for o in orders],
-        total=total,
-        limit=limit,
-        offset=offset,
-    )
-
-
-@router.post("/test-orders/{order_id}/advance", response_model=TestDeliveryOut)
-def advance_test_order(
-    order_id: int,
-    to: str = Query(..., description="accept | prepare | ready"),
-    admin: User = Depends(_ops),
-    db: Session = Depends(get_db),
-) -> TestDeliveryOut:
-    order = test_order_service.advance(db, order_id, admin, to)
-    return test_order_service.to_out(db, order)
-
-
-@router.post("/test-orders/{order_id}/assign", response_model=TestDeliveryOut)
-def assign_test_order(
-    order_id: int,
-    data: AssignRequest,
-    admin: User = Depends(_ops),
-    db: Session = Depends(get_db),
-) -> TestDeliveryOut:
-    order = test_order_service.assign_to_rider(db, order_id, admin, data.rider_id)
-    return test_order_service.to_out(db, order)
-
-
-@router.post("/test-orders/{order_id}/cancel", response_model=TestDeliveryOut)
-def cancel_test_order(
-    order_id: int,
-    admin: User = Depends(_ops),
-    db: Session = Depends(get_db),
-) -> TestDeliveryOut:
-    order = test_order_service.cancel(db, order_id, admin)
-    return test_order_service.to_out(db, order)
-
-
 # --- Overview -------------------------------------------------------------
 
 def _issue_out(issue: DeliveryIssue) -> DeliveryIssueOut:
@@ -429,7 +353,6 @@ def overview(_: User = Depends(_any_admin), db: Session = Depends(get_db)) -> Ov
             live_kitchen=live_kitchen,
             live_picked_up=live_picked_up,
             live_en_route=live_en_route,
-            platform_revenue_cents=int((gmv_today or 0) * 0.12),
         ),
         recent_applications=[_application_out(db, p) for p in recent_profiles],
         recent_issues=[_issue_out(i) for i in recent_issues],
@@ -634,14 +557,16 @@ def reactivate_partner(
 # --- Orders & issues ------------------------------------------------------
 
 def _order_summary(db: Session, order: Order) -> OrderSummaryOut:
-    mess = db.get(Mess, order.mess_id)
-    customer = db.get(User, order.customer_id)
+    mess = db.get(Mess, order.mess_id) if order.mess_id is not None else None
+    customer = db.get(User, order.customer_id) if order.customer_id is not None else None
     delivery = db.execute(
         select(Delivery).where(Delivery.order_id == order.id)
     ).scalar_one_or_none()
     rider = db.get(User, delivery.rider_id) if delivery and delivery.rider_id else None
     return OrderSummaryOut(
-        order_id=order.id, is_test=order.is_test, status=order.status.value,
+        order_id=order.id, external_order_ref=order.external_order_ref,
+        external_order_status=order.external_order_status,
+        is_test=order.is_test, status=order.status.value,
         mess_name=mess.name if mess else None,
         customer_name=customer.full_name if customer else None,
         rider_name=rider.full_name if rider else None,
@@ -654,9 +579,8 @@ def _order_summary(db: Session, order: Order) -> OrderSummaryOut:
 
 @router.get("/orders", response_model=Page[OrderSummaryOut])
 def list_orders(
-    q: str | None = Query(default=None, description="order id or partner name"),
+    q: str | None = Query(default=None, description="order id or external order id (ORD-…)"),
     status: OrderStatus | None = None,
-    is_test: bool | None = None,
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
     _: User = Depends(_any_admin),
@@ -667,12 +591,12 @@ def list_orders(
     if status is not None:
         stmt = stmt.where(Order.status == status)
         count_stmt = count_stmt.where(Order.status == status)
-    if is_test is not None:
-        stmt = stmt.where(Order.is_test.is_(is_test))
-        count_stmt = count_stmt.where(Order.is_test.is_(is_test))
-    if q and q.strip().isdigit():
-        stmt = stmt.where(Order.id == int(q.strip()))
-        count_stmt = count_stmt.where(Order.id == int(q.strip()))
+    term = (q or "").strip()
+    if term:
+        ref_match = Order.external_order_ref.ilike(f"%{term}%")
+        cond = or_(Order.id == int(term), ref_match) if term.isdigit() else ref_match
+        stmt = stmt.where(cond)
+        count_stmt = count_stmt.where(cond)
     total = db.execute(count_stmt).scalar_one()
     orders = db.execute(
         stmt.order_by(Order.id.desc()).limit(limit).offset(offset)

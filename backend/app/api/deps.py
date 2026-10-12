@@ -98,23 +98,33 @@ def require_admin_permission(*allowed: AdminRole):
     return _guard
 
 
-def require_integration_key(x_api_key: str | None = Header(default=None)) -> None:
-    """Server-to-server guard for the booking-app ingestion endpoint.
+def require_integration_key(
+    x_api_key: str | None = Header(default=None),
+    db: Session = Depends(get_db),
+) -> None:
+    """Server-to-server guard for the external-partner API.
 
-    Ingestion is disabled (503) until ``INTEGRATION_API_KEY`` is configured, so
-    the endpoint is never open by default. The comparison is constant-time.
+    Accepts any active key issued from the admin console, or the static
+    ``INTEGRATION_API_KEY`` from the environment. With neither configured the
+    API is disabled (503), so it is never open by default.
     """
-    expected = settings.integration_api_key
-    if not expected:
+    from app.services import partner_key_service
+
+    env_key = settings.integration_api_key
+    if not env_key and not partner_key_service.has_active_keys(db):
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Order ingestion is not configured",
+            detail="Partner API is not configured",
         )
-    if not x_api_key or not secrets.compare_digest(x_api_key, expected):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid or missing API key",
-        )
+    if x_api_key:
+        if env_key and secrets.compare_digest(x_api_key, env_key):
+            return
+        if partner_key_service.verify(db, x_api_key) is not None:
+            return
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Invalid or missing API key",
+    )
 
 
 # Convenience singletons.

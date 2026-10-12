@@ -1,26 +1,20 @@
-"""Rich offer detail for the delivery offer screen."""
+"""Offer detail for the delivery offer screen."""
 from __future__ import annotations
 
 from app.models.delivery import DeliveryBatch, DeliveryOffer
+from app.models.enums import PaymentStatus
 from app.models.mess import Mess
 from app.models.order import Order
-from app.services.eta_service import haversine_km, estimate_eta_minutes
-from app.services.pricing_service import offer_earnings, surge_cents_for_order, base_earning_cents, batch_incentive_cents
-
-
-def _handover_label(handover_type: str, order: Order) -> str:
-    if handover_type == "doorstep" or order.customer_note:
-        return "Contactless"
-    return "Direct handover"
+from app.services import pricing_service
+from app.services.eta_service import estimate_eta_minutes, haversine_km
 
 
 def _item_tags(order: Order) -> list[str]:
-    tags = []
-    for item in order.items:
-        qty = item.quantity
-        name = item.name_snapshot
-        tags.append(f"{qty}× {name}")
-    return tags[:4]
+    return [f"{item.quantity}× {item.name_snapshot}" for item in order.items][:4]
+
+
+def _is_prepaid(order: Order) -> bool:
+    return order.payment_status == PaymentStatus.paid or order.payment_method != "cod"
 
 
 def build_offer_detail(
@@ -30,29 +24,27 @@ def build_offer_detail(
     orders: list[Order],
     stops: list,
     earnings: dict,
+    rider_lat: float | None = None,
+    rider_lng: float | None = None,
 ) -> dict:
     first = orders[0] if orders else None
-    mess_lat = mess.lat if mess else 0.0
-    mess_lng = mess.lng if mess else 0.0
-    drop_lat = first.address_lat if first else 0.0
-    drop_lng = first.address_lng if first else 0.0
-    pickup_km = round(haversine_km(mess_lat, mess_lng, drop_lat, drop_lng) * 0.25, 1) if first and mess else 1.2
-    total_km = round(haversine_km(mess_lat, mess_lng, drop_lat, drop_lng) * 1.2, 1) if first and mess else 4.8
-    drop_km = round(max(total_km - pickup_km, 0.5), 1)
-    est_mins = max(18, int(estimate_eta_minutes(total_km)))
 
-    handover_type = "doorstep"
-    if stops:
-        d = stops[0]
-        handover_type = getattr(d, "handover_type", None) or handover_type
+    pickup_km = (
+        round(haversine_km(rider_lat, rider_lng, mess.lat, mess.lng), 1)
+        if mess is not None and rider_lat is not None and rider_lng is not None
+        else None
+    )
+    drop_km = pricing_service.route_km(first, mess) if first else None
+    known = [d for d in (pickup_km, drop_km) if d is not None]
+    total_km = round(sum(known), 1) if known else None
+    est_mins = int(estimate_eta_minutes(total_km)) if total_km is not None else None
 
-    item_count = sum(i.quantity for o in orders for i in o.items) or len(orders)
-    bag_count = max(1, min(3, (item_count + 1) // 2))
-    is_prepaid = first.payment_method in ("prepaid", "upi", "card") if first else False
-    surge = earnings.get("surge_cents", 0)
-    base = earnings.get("base_earning_cents", 0)
-    distance_pay = max(0, int(total_km * 833))
-    multiplier = round(1 + surge / base, 1) if base > 0 and surge > 0 else None
+    pays = [pricing_service.delivery_pay(o, mess) for o in orders]
+    distance_pay = sum(p["distance_pay_cents"] for p in pays)
+    base_fare = sum(p["base_fare_cents"] for p in pays)
+    surge = earnings["surge_cents"]
+    item_count = sum(i.quantity for o in orders for i in o.items)
+    prepaid = _is_prepaid(first) if first else False
 
     return {
         "id": offer.id,
@@ -61,44 +53,32 @@ def build_offer_detail(
         "sent_at": offer.sent_at,
         "expires_at": offer.expires_at,
         "mess_name": mess.name if mess else None,
-        "mess_lat": mess_lat,
-        "mess_lng": mess_lng,
+        "mess_lat": mess.lat if mess else None,
+        "mess_lng": mess.lng if mess else None,
         "mess_address": mess.address_text if mess else "",
         "order_count": len(orders),
         "base_earning_cents": earnings["base_earning_cents"],
-        "surge_cents": earnings["surge_cents"],
-        "incentive_cents": earnings["incentive_cents"],
+        "surge_cents": surge,
         "estimated_earning_cents": earnings["estimated_earning_cents"],
-        "is_high_demand": len(orders) >= 2 or earnings["surge_cents"] > 0,
         "stops": stops,
         "total_distance_km": total_km,
         "estimated_minutes": est_mins,
-        "route_label": "Optimized traffic route active",
         "pickup_distance_km": pickup_km,
         "drop_distance_km": drop_km,
-        "handover_type": handover_type,
-        "handover_label": _handover_label(handover_type, first) if first else "Contactless",
-        "bag_count": bag_count,
-        "bag_size_label": "Medium size" if bag_count <= 2 else "Large",
-        "is_express": len(orders) == 1 and item_count <= 3,
         "payout": {
-            "base_fare_cents": base,
+            "base_fare_cents": base_fare,
             "base_fare_label": "Base fare",
             "distance_pay_cents": distance_pay,
-            "distance_label": f"{total_km} km total",
+            "distance_label": f"{drop_km} km to drop-off" if drop_km is not None else "Distance unknown",
             "surge_bonus_cents": surge,
-            "surge_multiplier": multiplier,
-            "surge_label": f"+₹{surge // 100} Surge" if surge else None,
-            "surge_zone": None,
+            "surge_label": "Peak-hour bonus" if surge else None,
             "tip_cents": 0,
-            "tip_customer": "",
             "total_cents": earnings["estimated_earning_cents"],
         },
         "order_summary": {
             "item_count": item_count,
             "item_tags": _item_tags(first) if first else [],
-            "payment_label": "Prepaid" if is_prepaid else "COD",
-            "is_prepaid": is_prepaid,
-            "no_cash_collection": is_prepaid,
+            "payment_label": "Prepaid" if prepaid else "Cash on delivery",
+            "is_prepaid": prepaid,
         },
     }

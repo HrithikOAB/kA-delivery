@@ -14,13 +14,13 @@ export interface EndpointDoc {
 export const ORDERS_ENDPOINTS: EndpointDoc[] = [
   {
     method: 'GET',
-    path: '/admin/orders?q&status&is_test&limit',
-    description: 'List orders (filter by search, status, real/test).',
+    path: '/admin/orders?q&status&limit',
+    description: 'List orders stored locally (search by order id or external ORD- id, filter by status).',
   },
   {
     method: 'GET',
     path: '/admin/orders/{order_id}',
-    description: 'Full order detail: mess, customer, items, totals, assignment, timeline, issues.',
+    description: 'Order detail. Mess, customer, items and totals are fetched live from the external order API; assignment, timeline and issues come from our DB.',
   },
   {
     method: 'GET',

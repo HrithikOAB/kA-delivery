@@ -25,10 +25,12 @@ Native app (typechecked). All 7 planned phases are in place.
   transitions + audit), `dispatch_service` (batching + offer loop),
   `location_service` (validation/freshness/pruning), `tracking_service`
   (snapshot + authorization), `ws_manager` (order pub/sub), `eta_service`
-  (haversine + ETA), `earnings_service`, `order_service` (pricing/creation),
+  (haversine + ETA), `earnings_service`, `external_order_client` (external
+  getRiderOrder API), `order_hydration_service` (caches external order content at
+  assignment), `partner_order_service` (partner registration + tracking),
   `notification_service` (dev/expo), `payment_service` (cod/mock).
-- **API** (`app/api/v1`): `auth`, `messes`, `addresses`, `orders`, `mess_ops`,
-  `rider`, `deliveries`, `tracking_ws`, plus `/config` and `/health`.
+- **API** (`app/api/v1`): `auth`, `rider`, `deliveries`, `admin`, `partner`,
+  `maps`, `tracking_ws`, plus `/config` and `/health`.
 
 ## Authentication & roles
 
@@ -57,9 +59,11 @@ reconciled.
 ## Live tracking
 
 ### REST
-- `GET /api/v1/orders/{order_id}/tracking` — order-scoped snapshot for initial
-  render and recovery. Returns status, markers (mess/dropoff/rider), rider
-  marker with `is_stale`/`age_seconds`, ETA/distance, and a progress timeline.
+- `POST /api/v1/partner/tracking` (`X-API-Key`) — external-partner tracking by
+  order id: status, delivery partner details, live location with
+  `is_stale`/`age_seconds`, and ETA/distance.
+- `GET /api/v1/admin/orders/{order_id}/tracking` — admin order-scoped snapshot
+  (markers, rider marker, ETA/distance, progress timeline).
 
 ### WebSocket
 - `WS /api/v1/orders/{order_id}/tracking/ws?token=<JWT>` — authenticated,
@@ -113,7 +117,7 @@ completion; REST reconnection recovery.
 - **Customer ordering app**: intentionally not built; its backend contract is in
   `docs/integration-guide.md`.
 
-## Delivery-partner platform (admin dashboard + test-order tool)
+## Delivery-partner platform (admin dashboard + partner API)
 
 Added on top of the base app:
 
@@ -127,12 +131,15 @@ Added on top of the base app:
   with document upload (`POST /rider/documents`, stored under `UPLOAD_DIR`),
   admin review/approve/reject/request-correction, and resubmission. Only
   `approved` partners pass `require_approved_rider` (backend-enforced gate).
-- **Admin-only test-order tool**: `POST /api/v1/admin/test-orders` reuses the
-  **same** `order_service.create_order` path as the (future) customer app with an
-  `is_test` flag; test orders create a lightweight test pickup mess, flow through
-  the real dispatch/state/tracking pipeline, and are advanced/assigned/cancelled
-  by admin actions. Safeguards: test orders never authorize payment, capture
-  payment, or emit customer notifications, and stay filterable everywhere.
+- **External orders**: the external platform registers an order id via
+  `POST /api/v1/partner/orders` (`X-API-Key`). The admin order page reads mess,
+  customer, items and totals live from the external `getRiderOrder` API
+  (`external_order_client`); on assignment `order_hydration_service` caches that
+  content on the order so dispatch and the rider app work unchanged.
+  `POST /api/v1/partner/tracking` returns status, partner details and live
+  location (built on `tracking_service.build_snapshot`). The old full-payload
+  ingestion endpoint, the test-order tool, and the customer/mess-owner order APIs
+  were removed.
 - **Dashboard data & ops map**: live overview metrics, partner search + detail +
   suspend/reactivate, orders/issues with delivery timeline + internal notes, and
   a Leaflet/OSM operations map that **reuses** `tracking_service.build_snapshot`
@@ -140,10 +147,10 @@ Added on top of the base app:
   tracking system. Admin tracking is order-scoped via `admin_can_view`.
 - **Admin web app** (`admin/`): Vite + React + TS, JWT auth, role-gated nav, and
   loading / empty / error / stale states throughout.
-- **Tests**: `tests/test_admin_and_test_orders.py` covers admin auth + permission
-  tiers, verification transitions + audit, document upload/fetch, the full
-  test-order flow with side-effect safeguards, admin tracking access, and
-  suspend/reactivate.
+- **Tests**: `tests/test_admin.py` covers admin auth + permission
+  tiers, verification transitions + audit, document upload/fetch, admin tracking
+  access, and suspend/reactivate; `tests/test_partner_orders.py` covers order
+  registration, live external detail, assignment caching, and partner tracking.
 
 ## Manual verification
 

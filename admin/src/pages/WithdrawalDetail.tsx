@@ -58,9 +58,7 @@ export function WithdrawalDetail() {
                 {d.status === 'rejected' && <span className="wd-signoff-badge rejected">REJECTED</span>}
               </div>
               <div className="dispatch-actions">
-                <Link to="/withdrawals" className="btn secondary sm">Back to Requests</Link>
-                <button type="button" className="btn secondary sm">Export Audit PDF</button>
-                <button type="button" className="btn ghost sm danger-outline">Flag for Audit</button>
+                <Link to="/withdrawals" className="btn secondary sm">Back to list</Link>
               </div>
             </div>
 
@@ -81,11 +79,6 @@ export function WithdrawalDetail() {
                     <span className="wd-cycle">Payout Request</span>
                     {d.priority_queue && <span className="wd-cycle">Priority Fast-Track Queue</span>}
                     <span className="muted">{d.payout_cycle}</span>
-                  </div>
-                  <div className="wd-meta-grid muted">
-                    <div><strong>Settlement Gateway</strong><br />{d.settlement_gateway}</div>
-                    <div><strong>Escrow Lock State</strong><br />{d.escrow_lock_state}</div>
-                    <div><strong>Disbursal Target</strong><br />&lt; {d.disbursal_target_seconds}s Direct</div>
                   </div>
                 </div>
 
@@ -133,9 +126,9 @@ export function WithdrawalDetail() {
                     <h3>Destination Bank Node (Beneficiary)</h3>
                     {d.bank.penny_drop_verified && <span className="ver-pill ver-ok">Penny Drop Verified</span>}
                   </div>
-                  <div className="partner-name">{d.bank.bank_name} ({d.bank.branch})</div>
+                  <div className="partner-name">{d.bank.bank_name}</div>
                   <div className="muted">Account •••• {d.bank.account_masked} · IFSC {d.bank.ifsc_code}</div>
-                  <div className="muted">{d.bank.account_holder} — {d.bank.name_match_pct}% Match with KYC PAN</div>
+                  <div className="muted">{d.bank.account_holder}</div>
                 </div>
 
                 <div className="card wd-detail-card">
@@ -172,7 +165,7 @@ export function WithdrawalDetail() {
                           <td className="muted">{fmt(p.created_at)}</td>
                           <td>{money(p.amount_cents)}</td>
                           <td>{p.mode}</td>
-                          <td className="muted">{p.utr}</td>
+                          <td className="muted">{p.utr || '—'}</td>
                           <td><span className="ver-pill ver-ok">{p.status}</span></td>
                         </tr>
                       ))}
@@ -209,20 +202,12 @@ export function WithdrawalDetail() {
                       <button type="button" className="btn primary" style={{ width: '100%', marginBottom: 8 }} disabled={acting} onClick={approve}>
                         Approve &amp; Disburse {money(d.net_amount_cents)}
                       </button>
-                      <button type="button" className="btn secondary sm" style={{ width: '100%', marginBottom: 8 }} disabled>Put On Hold / Request Review</button>
                       <button type="button" className="btn danger sm" style={{ width: '100%' }} disabled={acting || !rejectReason} onClick={() => reject(rejectReason)}>Reject Withdrawal</button>
                     </>
                   )}
                   {d.admin_note && <div className="profile-alert" style={{ marginTop: 12 }}>{d.admin_note}</div>}
                 </div>
 
-                <div className="card wd-detail-card">
-                  <h3>Gateway Health &amp; Telemetry</h3>
-                  <div className="wd-panel-stat success">{d.gateway.status === 'operational' ? 'Online' : 'Degraded'}</div>
-                  <div className="muted">IMPS Switch · {d.gateway.imps_latency_seconds}s latency</div>
-                  <div className="muted">Daily Reserve Quota · {d.gateway.daily_reserve_remaining_pct}% remaining</div>
-                  <div className="muted">Statutory TDS · {money(d.gateway.tds_cents)}</div>
-                </div>
               </aside>
             </div>
           </>

@@ -38,7 +38,7 @@ export function AppHeader({ pendingCount = 0 }: { pendingCount?: number }) {
           className="header-payouts"
           onClick={() => navigate('/verification')}
         >
-          {pendingCount} Pending Payouts
+          {pendingCount} pending verifications
         </button>
         <button type="button" className="header-user" onClick={() => navigate('/settings')}>
           <span className="avatar">{me?.full_name?.charAt(0) ?? 'A'}</span>

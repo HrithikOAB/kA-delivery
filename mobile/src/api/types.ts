@@ -155,8 +155,8 @@ export interface DeliveryStop {
   sequence: number;
   customer_name: string;
   address_text: string;
-  address_lat: number;
-  address_lng: number;
+  address_lat: number | null;
+  address_lng: number | null;
   total_cents: number;
   payment_method?: string;
   items?: RiderOrderItem[];
@@ -224,8 +224,8 @@ export interface PickupDetail {
   gps_validation_note: string;
   rider_lat: number | null;
   rider_lng: number | null;
-  drop_lat: number;
-  drop_lng: number;
+  drop_lat: number | null;
+  drop_lng: number | null;
 }
 
 export interface DeliveryHandover {

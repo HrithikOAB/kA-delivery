@@ -59,7 +59,7 @@ def admin_can_view(order: Order, user: User) -> bool:
 
 
 def build_snapshot(db: Session, order: Order) -> TrackingSnapshot:
-    mess = db.get(Mess, order.mess_id)
+    mess = db.get(Mess, order.mess_id) if order.mess_id is not None else None
     delivery = db.execute(
         select(Delivery).where(Delivery.order_id == order.id)
     ).scalar_one_or_none()
@@ -97,24 +97,26 @@ def build_snapshot(db: Session, order: Order) -> TrackingSnapshot:
             )
             # ETA from the rider's live position once the meal is en route,
             # otherwise from the mess to the customer.
-            if order.status == OrderStatus.out_for_delivery:
+            has_dropoff = order.address_lat is not None and order.address_lng is not None
+            if has_dropoff and order.status == OrderStatus.out_for_delivery:
                 distance_km = haversine_km(
                     loc.lat, loc.lng, order.address_lat, order.address_lng
                 )
-            else:
+            elif has_dropoff and mess is not None:
                 distance_km = haversine_km(
                     mess.lat, mess.lng, order.address_lat, order.address_lng
                 )
-            eta_minutes = estimate_eta_minutes(distance_km)
+            if distance_km is not None:
+                eta_minutes = estimate_eta_minutes(distance_km)
 
     return TrackingSnapshot(
         order_id=order.id,
         status=order.status,
         is_trackable=is_trackable,
         updated_at=utcnow(),
-        mess_name=mess.name,
-        mess_lat=mess.lat,
-        mess_lng=mess.lng,
+        mess_name=mess.name if mess else None,
+        mess_lat=mess.lat if mess else None,
+        mess_lng=mess.lng if mess else None,
         dropoff_lat=order.address_lat,
         dropoff_lng=order.address_lng,
         dropoff_text=order.address_text,

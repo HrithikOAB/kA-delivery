@@ -26,15 +26,9 @@ from app.schemas.delivery import (
     DeliveryStop,
     EarningsDetailOut,
     EarningsResponse,
-    CashoutResultOut,
-    HotspotOut,
-    IncentiveQuestOut,
     OfferDetailOut,
     OfferOut,
     RiderDashboardOut,
-    DashboardQuestOut,
-    LastCompletedOut,
-    SurgeHotspotOut,
     RiderOrderItemOut,
 )
 from app.schemas.partner import (
@@ -63,7 +57,6 @@ from app.services import (
     earnings_service,
     history_service,
     location_service,
-    prep_service,
     offer_detail_service,
     pricing_service,
     verification_service,
@@ -234,7 +227,7 @@ def my_offers(
         deliveries = batch.deliveries
         orders = [db.get(Order, d.order_id) for d in deliveries]
         orders = [o for o in orders if o is not None]
-        earnings = pricing_service.offer_earnings(orders, len(deliveries))
+        earnings = pricing_service.offer_earnings(orders, mess)
         stops = _build_stops(db, batch)
         out.append(
             OfferOut(
@@ -249,9 +242,7 @@ def my_offers(
                 order_count=len(deliveries),
                 base_earning_cents=earnings["base_earning_cents"],
                 surge_cents=earnings["surge_cents"],
-                incentive_cents=earnings["incentive_cents"],
                 estimated_earning_cents=earnings["estimated_earning_cents"],
-                is_high_demand=len(deliveries) >= 2 or earnings["surge_cents"] > 0,
                 stops=stops,
             )
         )
@@ -276,9 +267,14 @@ def offer_detail(
     deliveries = batch.deliveries
     orders = [db.get(Order, d.order_id) for d in deliveries]
     orders = [o for o in orders if o is not None]
-    earnings = pricing_service.offer_earnings(orders, len(deliveries))
+    earnings = pricing_service.offer_earnings(orders, mess)
     stops = _build_stops(db, batch)
-    data = offer_detail_service.build_offer_detail(offer, batch, mess, orders, stops, earnings)
+    profile = user.rider_profile
+    data = offer_detail_service.build_offer_detail(
+        offer, batch, mess, orders, stops, earnings,
+        rider_lat=profile.last_lat if profile else None,
+        rider_lng=profile.last_lng if profile else None,
+    )
     return OfferDetailOut.model_validate(data)
 
 @router.get("/active", response_model=BatchOut | None)
@@ -320,7 +316,6 @@ def _build_stops(db: Session, batch: DeliveryBatch) -> list[DeliveryStop]:
                     )
                     for item in order.items
                 ],
-                prep_ready_in_minutes=prep_service.prep_ready_in_minutes(order),
                 **extra,
             )
         )
@@ -419,17 +414,6 @@ def earnings_detail(
     return EarningsDetailOut.model_validate(
         earnings_service.detail_for_rider(db, user.id, view=view)
     )
-
-
-@router.post("/earnings/cashout", response_model=CashoutResultOut)
-def earnings_cashout(
-    user: User = Depends(require_approved_rider),
-    db: Session = Depends(get_db),
-) -> CashoutResultOut:
-    result = earnings_service.instant_cashout(db, user.id)
-    return CashoutResultOut(**result)
-
-
 
 
 @router.get("/wallet", response_model=WalletOut)
@@ -537,21 +521,13 @@ def update_rider_profile(
 def rider_dashboard(
     user: User = Depends(require_approved_rider), db: Session = Depends(get_db)
 ) -> RiderDashboardOut:
-    data = dashboard_service.build_dashboard(db, user.id)
-    return RiderDashboardOut(
-        hotspots=[HotspotOut(**h) for h in data["hotspots"]],
-        incentive_quest=IncentiveQuestOut(**data["incentive_quest"]),
-        today_deliveries=data["today_deliveries"],
-        today_earnings_cents=data["today_earnings_cents"],
-    )
+    return RiderDashboardOut.model_validate(dashboard_service.build_dashboard(db, user.id))
 
 
 @router.get("/support", response_model=SupportHelpOut)
 def support_help(
     user: User = Depends(require_rider), db: Session = Depends(get_db)
 ) -> SupportHelpOut:
-    support_service.seed_faqs(db)
-    db.commit()
     return SupportHelpOut(**support_service.build_help_page(db, user))
 
 

@@ -29,6 +29,30 @@ def _reset_db() -> None:
     Base.metadata.create_all(bind=engine)
 
 
+@pytest.fixture(autouse=True)
+def external_orders(monkeypatch):
+    """Serve the external order API from ``tests.helpers.EXTERNAL_ORDERS``.
+
+    Autouse so no test can reach the real network.
+    """
+    from app.schemas.external_order import ExternalOrder
+    from app.services import external_order_client
+    from tests import helpers
+
+    helpers.EXTERNAL_ORDERS.clear()
+
+    def fake_fetch(ref: str) -> ExternalOrder:
+        payload = helpers.EXTERNAL_ORDERS.get(ref)
+        if payload is None:
+            raise external_order_client.ExternalOrderNotFound("Order not found")
+        if payload == "down":
+            raise external_order_client.ExternalOrderError("External order API is unreachable")
+        return ExternalOrder.model_validate(payload)
+
+    monkeypatch.setattr(external_order_client, "fetch_order", fake_fetch)
+    return helpers.EXTERNAL_ORDERS
+
+
 @pytest.fixture
 def client():
     from app import seed as seed_module

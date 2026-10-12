@@ -74,16 +74,13 @@ export function Withdrawals() {
 
   return (
     <div className="content withdrawals-page">
-      <div className="wd-breadcrumb muted">FINANCE GOVERNANCE / PAYOUT CONTROL SUITE</div>
       <div className="partners-head">
         <div>
-          <h1 className="dispatch-title">Withdrawal Requests &amp; Approvals</h1>
-          <p className="muted dispatch-sub">Real-time payout auditing and IMPS settlement governance</p>
-          <div className="wd-gateway-chip">Settlement Gateway IMPS Direct Node: <strong>{s?.gateway_status === 'operational' ? 'Operational' : 'Degraded'}</strong></div>
+          <h1 className="dispatch-title">Withdrawal requests</h1>
+          <p className="muted dispatch-sub">Review and approve partner payout requests</p>
         </div>
         <div className="dispatch-actions">
-          <button type="button" className="btn secondary sm">Reconcile Ledgers</button>
-          <button type="button" className="btn primary sm" onClick={() => exportCsv(rows)}>Export Audit CSV</button>
+          <button type="button" className="btn primary sm" onClick={() => exportCsv(rows)}>Export CSV</button>
         </div>
       </div>
 
@@ -92,46 +89,42 @@ export function Withdrawals() {
           <>
             <div className="wd-kpi-grid">
               <div className="kpi-card kpi-yellow">
-                <span className="kpi-label">Pending Approvals</span>
+                <span className="kpi-label">Pending</span>
                 <div className="kpi-value">{counts.pending}</div>
                 <div className="kpi-sub">{formatGmv(s?.pending_amount_cents ?? 0)}</div>
-                <span className="pending-badge">Action Required</span>
               </div>
               <div className="kpi-card kpi-green">
-                <span className="kpi-label">Approved Today</span>
+                <span className="kpi-label">Approved today</span>
                 <div className="kpi-value">{counts.approved}</div>
                 <div className="kpi-sub">{formatGmv(s?.approved_today_amount_cents ?? 0)}</div>
-                <span className="chip">Via IMPS Instant</span>
               </div>
               <div className="kpi-card kpi-neutral">
-                <span className="kpi-label">Rejected / Flagged</span>
+                <span className="kpi-label">Rejected</span>
                 <div className="kpi-value">{counts.rejected}</div>
                 <div className="kpi-sub">{formatGmv(s?.rejected_amount_cents ?? 0)}</div>
-                <span className="chip danger">Account Mismatch</span>
               </div>
               <div className="kpi-card kpi-escrow">
-                <span className="kpi-label">Escrow Reserve Balance</span>
+                <span className="kpi-label">Wallet balances (all riders)</span>
                 <div className="kpi-value escrow">{formatGmv(s?.escrow_reserve_cents ?? 0)}</div>
-                <div className="kpi-sub">RBI Compliant Pool · {s?.liquidity_ratio ?? 0}x Liquidity</div>
+                <div className="kpi-sub muted">Sum of ledger balances</div>
               </div>
             </div>
 
             <div className="wd-toolbar">
               <div className="partners-segments">
-                {([['all', `All Requests (${counts.all})`], ['pending_review', `Pending Review (${counts.pending})`], ['approved', `Approved (${counts.approved})`], ['rejected', `Rejected (${counts.rejected})`]] as [Tab, string][]).map(([id, label]) => (
+                {([['all', `All (${counts.all})`], ['pending_review', `Pending (${counts.pending})`], ['approved', `Approved (${counts.approved})`], ['rejected', `Rejected (${counts.rejected})`]] as [Tab, string][]).map(([id, label]) => (
                   <button key={id} type="button" className={`seg-btn ${tab === id ? 'active' : ''}`} onClick={() => { setTab(id); setSelected(new Set()); }}>{label}</button>
                 ))}
               </div>
               <span className="date-pill">Today: {today}</span>
-              <button type="button" className="btn secondary sm" disabled={!selected.size || acting} onClick={bulkApprove}>Approve Selected ({selected.size})</button>
-              <button type="button" className="btn ghost sm">Export Bank IMPS File</button>
+              <button type="button" className="btn secondary sm" disabled={!selected.size || acting} onClick={bulkApprove}>Approve selected ({selected.size})</button>
             </div>
 
             <div className="wd-search-row">
-              <input className="partners-search" placeholder="Partner Name, ID, or Account Number…" aria-label="Search withdrawals" value={q} onChange={(e) => setQ(e.target.value)} />
+              <input className="partners-search" placeholder="Partner name, phone, or reference…" aria-label="Search withdrawals" value={q} onChange={(e) => setQ(e.target.value)} />
               <div className="wd-legend muted">
-                <span>Auto-Disbursement: On (&lt;₹5,000)</span>
-                <span>Manual Sign-off (&gt;₹5,000)</span>
+                <span>Auto-approve under ₹5,000</span>
+                <span>Manual review above ₹5,000</span>
               </div>
             </div>
 
@@ -139,13 +132,13 @@ export function Withdrawals() {
               <table className="partners-table wd-table">
                 <thead>
                   <tr>
-                    <th>Request ID &amp; Time</th>
-                    <th>Delivery Partner</th>
-                    <th>Amount Requested</th>
-                    <th>Wallet Snapshot</th>
-                    <th>Destination Bank</th>
-                    <th>Risk Matrix</th>
-                    <th>Status &amp; Actions</th>
+                    <th>Request</th>
+                    <th>Partner</th>
+                    <th>Amount</th>
+                    <th>Wallet</th>
+                    <th>Bank</th>
+                    <th>Risk</th>
+                    <th>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -156,38 +149,35 @@ export function Withdrawals() {
                       <td>
                         <div className="wd-ref">#{r.reference_number}</div>
                         <div className="muted">{formatTime(r.created_at)}</div>
-                        <span className="wd-cycle">{r.payout_cycle}</span>
                       </td>
                       <td>
                         <div className="partner-cell">
                           <div className="lt-avatar sm">{initials(r.rider_name)}</div>
                           <div>
                             <div className="partner-name">{r.rider_name}</div>
-                            <div className="partner-meta">{r.partner_code} · ★ {r.rating != null ? r.rating.toFixed(1) : '—'}</div>
-                            {r.fleet_tier && <span className="wd-tier">{r.fleet_tier}</span>}
+                            <div className="partner-meta">{r.partner_code ?? '—'} · ★ {r.rating != null ? r.rating.toFixed(1) : '—'}</div>
                           </div>
                         </div>
                       </td>
                       <td>
                         <div className="wd-amount">{money(r.amount_cents)}</div>
-                        <div className="muted">{r.requires_dual_signoff ? 'Dual-Admin Sign-off' : 'Zero Commission Fee'}</div>
+                        {r.requires_dual_signoff && <div className="muted">Needs dual approval</div>}
                       </td>
                       <td>
-                        <div><strong>{money(r.wallet_balance_cents)}</strong> <span className="muted">current</span></div>
-                        <div className="muted">→ {money(r.post_cashout_balance_cents)} post-cashout</div>
+                        <div><strong>{money(r.wallet_balance_cents)}</strong> <span className="muted">balance</span></div>
+                        <div className="muted">→ {money(r.post_cashout_balance_cents)} after</div>
                       </td>
                       <td>
-                        <div className="partner-name">{r.bank_name} {r.bank_verified && <span className="ver-ok">✓</span>}</div>
+                        <div className="partner-name">{r.bank_name}</div>
                         <div className="muted">•••• {r.bank_account_masked}</div>
-                        <div className="muted">{r.ifsc_code} · {r.account_holder}</div>
+                        <div className="muted">{r.ifsc_code}</div>
                       </td>
                       <td>
-                        <span className={`risk-pill ${r.risk_score >= 95 ? 'low' : r.risk_score >= 85 ? 'med' : 'high'}`}>{r.risk_label} · {r.risk_score}/100</span>
+                        <span className={`risk-pill ${r.risk_score >= 95 ? 'low' : r.risk_score >= 85 ? 'med' : 'high'}`}>{r.risk_label} · {r.risk_score}</span>
                         <div className="muted wd-risk-note">{r.risk_note}</div>
                       </td>
                       <td>
-                        <span className={`wd-status ${r.status}`}>{r.status === 'pending_review' ? 'PENDING REVIEW' : r.status.toUpperCase()}</span>
-                        <button type="button" className="btn primary xs" onClick={(e) => { e.stopPropagation(); navigate(`/withdrawals/${r.id}`); }}>Inspect</button>
+                        <span className={`wd-status ${r.status}`}>{r.status === 'pending_review' ? 'Pending' : r.status}</span>
                         {r.status === 'pending_review' && (
                           <div className="partner-actions" style={{ marginTop: 8 }}>
                             <label className="wd-check" onClick={(e) => e.stopPropagation()}><input type="checkbox" checked={selected.has(r.id)} onChange={() => toggle(r.id)} /></label>
@@ -201,24 +191,6 @@ export function Withdrawals() {
                   ))}
                 </tbody>
               </table>
-            </div>
-
-            <div className="wd-footer-panels">
-              <div className="card wd-panel">
-                <h4>IMPS Node Health</h4>
-                <div className="wd-panel-stat success">{s?.imps_success_rate ?? 99.98}% success</div>
-                <div className="muted">Latency {s?.imps_latency_seconds ?? 1.8}s · Daily cap {s?.daily_cap_used_pct ?? 42}% used</div>
-              </div>
-              <div className="card wd-panel">
-                <h4>TDS &amp; 194C Compliance</h4>
-                <div className="wd-panel-stat">{formatGmv(s?.tds_ytd_cents ?? 0)} YTD</div>
-                <div className="muted">Today TDS {money(s?.tds_today_cents ?? 0)} · <button type="button" className="link-btn">Generate Form 16A</button></div>
-              </div>
-              <div className="card wd-panel">
-                <h4>Fraud Detection Rules</h4>
-                <div className="wd-panel-stat warn">{s?.fraud_rules_triggered ?? 0} Active Rules Triggered</div>
-                <div className="muted">Rule 04: Mobile number mismatch · <button type="button" className="link-btn">Tune Heuristics</button></div>
-              </div>
             </div>
           </>
         )}

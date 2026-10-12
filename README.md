@@ -11,24 +11,25 @@ digi-mess/
 ├── backend/   FastAPI + SQLAlchemy + Alembic (SQLite), JWT auth, WebSocket tracking
 ├── mobile/    Expo + React Native + TypeScript (expo-router) — delivery-partner app
 ├── admin/     Vite + React + TypeScript admin dashboard (verification, ops map,
-│              orders/issues, and the admin-only Create Test Delivery tool)
-└── docs/      Environment setup, implementation status, customer-app integration guide
+│              orders/issues, delivery assignment)
+└── docs/      Environment setup, implementation status, partner integration guide
 ```
 
-The **admin dashboard** and **admin-only test-order tool** are first-class parts
-of this project. The **customer ordering app is intentionally not built** — its
-backend contract is documented for a separate team (see the integration guide).
+Orders are owned by an **external ordering platform**. The platform registers an
+order id through the partner API (`POST /api/v1/partner/orders`); the admin
+console reads the order's content live from the platform's `getRiderOrder` API,
+ops assign a delivery partner, and the platform polls
+`POST /api/v1/partner/tracking` for status and live location. See the
+[partner integration guide](docs/integration-guide.md).
 
 ## Features
 
-- **Customer**: **phone + OTP** sign-in, saved addresses, mess discovery (distance-sorted),
-  menu browsing, cart, **server-computed checkout**, order placement, order
-  history (offline-cached), and a polished **live tracking** screen.
+- **External partner API**: register an order id, then poll tracking (status,
+  delivery partner details, live coordinates). Authenticated with `X-API-Key`.
 - **Delivery partner**: register (+ vehicle info) with approval gating,
   go online/offline, receive & accept/reject batched delivery offers, navigate,
   confirm pickup, **complete each stop with the customer's OTP**, and view
   earnings/payouts.
-- **Mess/kitchen**: accept → prepare → mark ready, which triggers dispatch.
 - **Live tracking**: rider location ingestion with validation (ownership,
   freshness, implausible-jump/speed rejection), order-scoped WebSocket push,
   REST snapshot fallback, reconnect with backoff, stale-location indicators, and
@@ -86,8 +87,7 @@ npm run dev                        # http://localhost:5173
 
 The admin dashboard (React + TypeScript + Vite, maps via Leaflet + OpenStreetMap —
 no map key required) provides partner **verification**, **partner management**,
-a **live operations map**, **orders & issues**, and the admin-only
-**Create Test Delivery** tool. It talks to the same backend; ensure the backend
+a **live operations map**, and **orders & issues** with delivery assignment. It talks to the same backend; ensure the backend
 `CORS_ORIGINS` permits `http://localhost:5173` (the default `*` already does).
 
 ### Demo accounts
@@ -102,7 +102,7 @@ Admins, riders and mess owners sign in with **email + password** (`password123`)
 |----------|--------------------------|----------------------------------------------|
 | Admin    | `admin@kadelivery.app`     | Super admin (all permissions)                |
 | Admin    | `verifier@digimess.app`  | Partner-verification tier                    |
-| Admin    | `ops@digimess.app`       | Operations tier (test orders, live map)      |
+| Admin    | `ops@digimess.app`       | Operations tier (assignment, live map)       |
 | Rider    | `rider@digimess.app`     | Approved; can go online                      |
 | Rider    | `applicant@digimess.app` | Application **under review** (approve in UI) |
 | Mess     | `mess@digimess.app`      | Owns "Digi Mess Kitchen"                     |
@@ -119,22 +119,24 @@ This is the primary golden path for the delivery-partner platform:
    verification** → open `applicant@digimess.app` → review documents → **Approve**.
 2. On mobile, the approved **partner** signs in and taps **ONLINE**.
    (New applicants upload documents under **Manage documents & verification**.)
-3. **Admin** → **Create Test Delivery** → pick pickup + drop-off on the map (or
-   enter coordinates) → **Review & create**. The order is marked **TEST** and
-   appears as an unassigned delivery.
-4. **Admin** advances it (Accept → Prepare → Ready); the real dispatch engine
-   assigns/offers it to the online partner.
+3. **Admin** → **Settings** → **Partner API keys** → **Generate key**, then
+   register an order id with it:
+   `curl -X POST localhost:8000/api/v1/partner/orders -H 'X-API-Key: <key>' -H 'Content-Type: application/json' -d '{"order_id":"ORD-10001"}'`.
+   It appears under **Orders**; opening it loads the details from the external
+   order API.
+4. **Admin** → open the order → **KA Delivery partner** → **Send offer** to the
+   online partner. The pickup/drop-off details are cached at this point.
 5. **Partner** receives the offer → accepts → **Mark arrival** → **Confirm pickup**;
    the device location broadcast begins.
 6. **Admin** → **Live operations** map shows the moving marker with a
    last-updated time and a **stale** indicator if updates stop.
-7. **Partner** enters the delivery **OTP** (shown on the test order) → **Complete
-   delivery**. Test orders never fire real payments or customer notifications.
+7. **Partner** enters the delivery **OTP** → **Complete delivery**. Meanwhile
+   `POST /api/v1/partner/tracking` returns the partner's details and location.
 8. **Admin** → **Orders & issues** shows the final status and full timeline;
    earnings update in the partner app.
 
-> The **customer ordering app** is intentionally **not** built here — the backend
-> exposes the contract for it in [`docs/integration-guide.md`](docs/integration-guide.md).
+> The **customer ordering app** is not part of this project — orders come from
+> the external platform via [`docs/integration-guide.md`](docs/integration-guide.md).
 
 ## Maps
 
@@ -147,7 +149,7 @@ build a dev/prod client to enable native `react-native-maps`.
 ## Documentation
 
 - [`docs/integration-guide.md`](docs/integration-guide.md) — contract for the
-  separate **customer-app team**: order creation, status, tracking snapshot + WS.
+  **external ordering platform**: order registration and tracking.
 - [`docs/environment-setup.md`](docs/environment-setup.md) — every environment
   variable, SQLite→PostgreSQL migration, run commands.
 - [`docs/implementation-status.md`](docs/implementation-status.md) — what's done,

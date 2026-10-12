@@ -22,7 +22,7 @@ def test_wrong_password_rejected(client):
 def test_customer_cannot_login_as_rider(client):
     resp = client.post(
         "/api/v1/auth/rider/login",
-        json={"email": "customer@digimess.app", "password": "password123"},
+        json={"email": "admin@kadelivery.app", "password": "password123"},
     )
     assert resp.status_code == 401
 

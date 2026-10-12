@@ -31,6 +31,11 @@ defaults in `app/config.py`; override for anything non-local.
 | `NOTIFICATION_PROVIDER` | `dev` | `dev` (in-memory/log) or `expo` (real push, needs wiring). |
 | `EXPO_ACCESS_TOKEN` | _(empty)_ | For a real Expo push provider. |
 | `PAYMENT_PROVIDER` | `cod` | `cod` (pay on delivery) or `mock` (instant paid). |
+| `INTEGRATION_API_KEY` | _(empty)_ | Optional static key partners may send as `X-API-Key` to `/api/v1/partner/*`. Prefer keys issued from the admin console (**Settings → Partner API keys**). With neither configured the partner API returns 503. |
+| `EXTERNAL_ORDER_API_URL` | getRiderOrder Prod URL | External API that returns order content (mess, customer, items, totals). |
+| `EXTERNAL_ORDER_API_TIMEOUT_SECONDS` | `8` | Timeout for each external order API call. |
+| `EXTERNAL_ORDER_API_KEY` | _(empty)_ | Credential the external platform issues to us for getRiderOrder. Sent only when set. |
+| `EXTERNAL_ORDER_API_KEY_HEADER` | `x-api-key` | Header carrying that credential. For a bearer token use `Authorization` with the value `Bearer <token>`. |
 | `CORS_ORIGINS` | `*` | Comma-separated allowed origins. |
 
 ## Mobile (`mobile/.env`)

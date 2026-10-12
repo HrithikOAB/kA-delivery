@@ -11,15 +11,12 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
 from app.services.ws_manager import manager
 from app.api.v1 import (
-    addresses,
     admin,
+    admin_api_keys,
     auth,
     deliveries,
-    integration,
     maps,
-    mess_ops,
-    messes,
-    orders,
+    partner,
     rider,
     tracking_ws,
 )
@@ -65,12 +62,9 @@ api.include_router(auth.router)
 api.include_router(rider.router)
 api.include_router(maps.router)
 api.include_router(deliveries.router)
-api.include_router(messes.router)
-api.include_router(addresses.router)
-api.include_router(orders.router)
-api.include_router(mess_ops.router)
 api.include_router(admin.router)
-api.include_router(integration.router)
+api.include_router(admin_api_keys.router)
+api.include_router(partner.router)
 api.include_router(tracking_ws.router)
 
 

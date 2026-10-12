@@ -25,6 +25,22 @@ export interface Me {
   admin_role: string | null;
 }
 
+export interface PartnerApiKey {
+  id: number;
+  name: string;
+  key_prefix: string;
+  is_active: boolean;
+  created_at: string;
+  last_used_at: string | null;
+  rotated_at: string | null;
+  revoked_at: string | null;
+}
+
+/** Only returned by create/rotate; the secret can't be fetched again. */
+export interface PartnerApiKeySecret extends PartnerApiKey {
+  api_key: string;
+}
+
 export interface Page<T> {
   items: T[];
   total: number;
@@ -99,7 +115,6 @@ export interface OverviewMetrics {
   live_kitchen: number;
   live_picked_up: number;
   live_en_route: number;
-  platform_revenue_cents: number;
 }
 
 export interface FleetLeader {
@@ -242,6 +257,8 @@ export interface PartnerUpdatePayload {
 
 export interface OrderSummary {
   order_id: number;
+  external_order_ref: string | null;
+  external_order_status: string | null;
   is_test: boolean;
   status: string;
   mess_name: string | null;
@@ -255,11 +272,11 @@ export interface OrderSummary {
 }
 
 export interface OrderMessInfo {
-  mess_id: number;
+  mess_id: number | null;
   name: string;
   address_text: string;
-  lat: number;
-  lng: number;
+  lat: number | null;
+  lng: number | null;
   contact_phone: string;
 }
 
@@ -267,8 +284,8 @@ export interface OrderCustomerInfo {
   name: string;
   phone: string | null;
   dropoff_text: string;
-  dropoff_lat: number;
-  dropoff_lng: number;
+  dropoff_lat: number | null;
+  dropoff_lng: number | null;
   note: string;
 }
 
@@ -277,6 +294,7 @@ export interface OrderItemLine {
   unit_price_cents: number;
   quantity: number;
   line_total_cents: number;
+  food_type: string | null;
 }
 
 export interface OrderAssignment {
@@ -290,10 +308,14 @@ export interface OrderAssignment {
 }
 
 export interface OrderDetail extends OrderSummary {
-  dropoff_text: string;
+  dropoff_text: string | null;
+  external_error: string | null;
+  placed_at: string | null;
   subtotal_cents: number;
   delivery_fee_cents: number;
   tax_cents: number;
+  amount_to_collect_cents: number | null;
+  currency: string;
   payment_status: string;
   payment_method: string;
   external_reference: string | null;
@@ -352,33 +374,15 @@ export interface ActiveDelivery {
   delivery_status: string | null;
   rider_id: number | null;
   rider_name: string | null;
-  pickup_lat: number;
-  pickup_lng: number;
+  pickup_lat: number | null;
+  pickup_lng: number | null;
   pickup_label: string | null;
-  dropoff_lat: number;
-  dropoff_lng: number;
-  dropoff_text: string;
+  dropoff_lat: number | null;
+  dropoff_lng: number | null;
+  dropoff_text: string | null;
   rider_marker: RiderMarker | null;
   eta_minutes: number | null;
   distance_km: number | null;
-}
-
-export interface TestDelivery {
-  order_id: number;
-  is_test: boolean;
-  status: string;
-  pickup_label: string;
-  pickup_lat: number;
-  pickup_lng: number;
-  dropoff_label: string;
-  dropoff_lat: number;
-  dropoff_lng: number;
-  test_note: string | null;
-  rider_id: number | null;
-  rider_name: string | null;
-  delivery_status: string | null;
-  otp_code: string | null;
-  created_at: string;
 }
 
 
@@ -421,20 +425,10 @@ export interface WithdrawalSummary {
   rejected_amount_cents: number;
   escrow_reserve_cents: number;
   liquidity_ratio: number;
-  gateway_status: string;
-  imps_success_rate: number;
-  imps_latency_seconds: number;
-  daily_cap_used_pct: number;
-  tds_ytd_cents: number;
-  tds_today_cents: number;
-  fraud_rules_triggered: number;
   total_count: number;
 }
 
 export interface WithdrawalDetail extends WithdrawalRequest {
-  settlement_gateway: string;
-  escrow_lock_state: string;
-  disbursal_target_seconds: number;
   priority_queue: boolean;
   partner: {
     rider_id: number;
@@ -466,7 +460,7 @@ export interface WithdrawalDetail extends WithdrawalRequest {
     ifsc_code: string;
     account_holder: string;
     penny_drop_verified: boolean;
-    name_match_pct: number;
+    name_match_pct: number | null;
   };
   earning_components: {
     reference: string;
@@ -485,6 +479,5 @@ export interface WithdrawalDetail extends WithdrawalRequest {
     status: string;
   }[];
   risk: { score: number; label: string; checks: { label: string; ok: boolean }[] };
-  gateway: { status: string; imps_latency_seconds: number; daily_reserve_remaining_pct: number; tds_cents: number };
   reject_reasons: string[];
 }

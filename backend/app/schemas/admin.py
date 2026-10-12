@@ -62,27 +62,6 @@ class PartnerApplicationDetail(PartnerApplicationOut):
     history: list[AuditEventOut] = []
 
 
-# --- Test-order tool ------------------------------------------------------
-
-class TestDeliveryCreate(BaseModel):
-    pickup_label: str = Field(default="TEST Pickup", max_length=255)
-    pickup_lat: float = Field(ge=-90, le=90)
-    pickup_lng: float = Field(ge=-180, le=180)
-    pickup_instructions: str = Field(default="", max_length=500)
-
-    dropoff_label: str = Field(default="TEST Drop-off", max_length=255)
-    dropoff_lat: float = Field(ge=-90, le=90)
-    dropoff_lng: float = Field(ge=-180, le=180)
-    delivery_instructions: str = Field(default="", max_length=500)
-
-    customer_name: str = Field(default="", max_length=255)
-    customer_contact: str = Field(default="", max_length=64)
-
-
-class AssignRequest(BaseModel):
-    rider_id: int
-
-
 # --- Overview -------------------------------------------------------------
 
 class FleetLeaderOut(BaseModel):
@@ -104,7 +83,6 @@ class OverviewMetrics(BaseModel):
     live_kitchen: int = 0
     live_picked_up: int = 0
     live_en_route: int = 0
-    platform_revenue_cents: int = 0
 
 
 class OverviewOut(BaseModel):
@@ -171,7 +149,7 @@ class PartnerActiveOrderOut(BaseModel):
     order_id: int
     status: str
     pickup_label: str
-    dropoff_text: str
+    dropoff_text: str | None = None
     total_cents: int
     eta_minutes: float | None = None
     progress_step: int = 0
@@ -254,6 +232,9 @@ class PartnerDetail(PartnerListItem):
 
 class OrderSummaryOut(BaseModel):
     order_id: int
+    # External platform order id (e.g. "ORD-10001") for partner-registered orders.
+    external_order_ref: str | None = None
+    external_order_status: str | None = None
     is_test: bool
     status: str
     mess_name: str | None
@@ -267,20 +248,21 @@ class OrderSummaryOut(BaseModel):
 
 
 class OrderMessInfo(BaseModel):
-    mess_id: int
+    # Null when the mess comes live from the external API and is not cached yet.
+    mess_id: int | None = None
     name: str
     address_text: str
-    lat: float
-    lng: float
+    lat: float | None = None
+    lng: float | None = None
     contact_phone: str = ""
 
 
 class OrderCustomerInfo(BaseModel):
     name: str
     phone: str | None = None
-    dropoff_text: str
-    dropoff_lat: float
-    dropoff_lng: float
+    dropoff_text: str = ""
+    dropoff_lat: float | None = None
+    dropoff_lng: float | None = None
     note: str = ""
 
 
@@ -289,6 +271,7 @@ class OrderItemLine(BaseModel):
     unit_price_cents: int
     quantity: int
     line_total_cents: int
+    food_type: str | None = None
 
 
 class OrderAssignment(BaseModel):
@@ -304,11 +287,17 @@ class OrderAssignment(BaseModel):
 
 
 class OrderDetailOut(OrderSummaryOut):
-    dropoff_text: str
+    dropoff_text: str | None = None
+    # Set when the external order API could not be read; the rest of the
+    # payload then falls back to whatever is stored locally.
+    external_error: str | None = None
+    placed_at: str | None = None
     # Money breakdown.
     subtotal_cents: int = 0
     delivery_fee_cents: int = 0
     tax_cents: int = 0
+    amount_to_collect_cents: int | None = None
+    currency: str = "INR"
     payment_status: str = "pending"
     payment_method: str = "cod"
     # Fulfillment / external courier.
@@ -379,33 +368,15 @@ class ActiveDeliveryOut(BaseModel):
     delivery_status: str | None
     rider_id: int | None
     rider_name: str | None
-    pickup_lat: float
-    pickup_lng: float
+    pickup_lat: float | None
+    pickup_lng: float | None
     pickup_label: str | None
-    dropoff_lat: float
-    dropoff_lng: float
-    dropoff_text: str
+    dropoff_lat: float | None
+    dropoff_lng: float | None
+    dropoff_text: str | None
     rider_marker: RiderMarkerOut | None = None
     eta_minutes: float | None = None
     distance_km: float | None = None
-
-
-class TestDeliveryOut(BaseModel):
-    order_id: int
-    is_test: bool
-    status: str
-    pickup_label: str
-    pickup_lat: float
-    pickup_lng: float
-    dropoff_label: str
-    dropoff_lat: float
-    dropoff_lng: float
-    test_note: str | None = None
-    rider_id: int | None = None
-    rider_name: str | None = None
-    delivery_status: str | None = None
-    otp_code: str | None = None
-    created_at: datetime
 
 
 # --- Withdrawals ----------------------------------------------------------
@@ -449,13 +420,6 @@ class WithdrawalSummaryOut(BaseModel):
     rejected_amount_cents: int
     escrow_reserve_cents: int
     liquidity_ratio: float
-    gateway_status: str
-    imps_success_rate: float
-    imps_latency_seconds: float
-    daily_cap_used_pct: int
-    tds_ytd_cents: int
-    tds_today_cents: int
-    fraud_rules_triggered: int
     total_count: int
 
 
@@ -501,7 +465,7 @@ class WithdrawalBankOut(BaseModel):
     ifsc_code: str
     account_holder: str
     penny_drop_verified: bool
-    name_match_pct: int
+    name_match_pct: int | None = None
 
 
 class WithdrawalEarningLineOut(BaseModel):
@@ -533,17 +497,7 @@ class WithdrawalRiskOut(BaseModel):
     checks: list[WithdrawalRiskCheckOut]
 
 
-class WithdrawalGatewayOut(BaseModel):
-    status: str
-    imps_latency_seconds: float
-    daily_reserve_remaining_pct: int
-    tds_cents: int
-
-
 class WithdrawalDetailOut(WithdrawalRequestOut):
-    settlement_gateway: str
-    escrow_lock_state: str
-    disbursal_target_seconds: float
     priority_queue: bool
     partner: WithdrawalPartnerOut
     wallet: WithdrawalWalletOut
@@ -551,5 +505,4 @@ class WithdrawalDetailOut(WithdrawalRequestOut):
     earning_components: list[WithdrawalEarningLineOut]
     payout_history: list[WithdrawalPayoutHistoryOut]
     risk: WithdrawalRiskOut
-    gateway: WithdrawalGatewayOut
     reject_reasons: list[str]

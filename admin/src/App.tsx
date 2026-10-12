@@ -11,8 +11,7 @@ import { PartnerEdit } from '@/pages/PartnerEdit';
 import { Operations } from '@/pages/Operations';
 import { Orders } from '@/pages/Orders';
 import { OrderDetailPage } from '@/pages/OrderDetail';
-import { TestOrders } from '@/pages/TestOrders';
-import { Placeholder } from '@/pages/Placeholder';
+import { Settings } from '@/pages/Settings';
 import { Withdrawals } from '@/pages/Withdrawals';
 import { WithdrawalDetail } from '@/pages/WithdrawalDetail';
 import type { ReactNode } from 'react';
@@ -43,12 +42,9 @@ export function App() {
         <Route path="/partners/:riderId" element={<PartnerProfile />} />
         <Route path="/operations" element={<Operations />} />
         <Route path="/verification" element={<Verification />} />
-        <Route path="/earnings" element={<Placeholder title="Earnings & Payments" subtitle="Partner earnings, commission splits, and settlement history will appear here." />} />
         <Route path="/withdrawals" element={<Withdrawals />} />
         <Route path="/withdrawals/:id" element={<WithdrawalDetail />} />
-        <Route path="/test-orders" element={<TestOrders />} />
-        <Route path="/reports" element={<Placeholder title="Reports" subtitle="Operational and financial reports are coming soon." />} />
-        <Route path="/settings" element={<Placeholder title="Settings" subtitle="Admin preferences and team access controls will be configured here." />} />
+        <Route path="/settings" element={<Settings />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
