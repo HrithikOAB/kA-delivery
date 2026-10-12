@@ -16,7 +16,7 @@ _NULLABLE = [
     ('address_lng', sa.Float()),
 ]
 
-_TEST_ORDERS = "SELECT id FROM orders WHERE is_test = 1"
+_TEST_ORDERS = "SELECT id FROM orders WHERE is_test IS TRUE"
 _TEST_DELIVERIES = f"SELECT id FROM deliveries WHERE order_id IN ({_TEST_ORDERS})"
 _TEST_BATCHES = f"SELECT batch_id FROM deliveries WHERE order_id IN ({_TEST_ORDERS})"
 
@@ -39,7 +39,7 @@ def upgrade():
     op.execute("DELETE FROM delivery_batches WHERE id IN (SELECT batch_id FROM _purge_batches)")
     op.execute("DROP TABLE _purge_batches")
     op.execute(f"DELETE FROM order_items WHERE order_id IN ({_TEST_ORDERS})")
-    op.execute("DELETE FROM orders WHERE is_test = 1")
+    op.execute("DELETE FROM orders WHERE is_test IS TRUE")
 
 
 def downgrade():

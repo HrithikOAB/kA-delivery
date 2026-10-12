@@ -7,8 +7,9 @@ hard-coded elsewhere. See ``.env.example`` for the full list and
 from __future__ import annotations
 
 from functools import lru_cache
+from urllib.parse import quote_plus
 
-from pydantic import Field, model_validator
+from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -22,8 +23,14 @@ class Settings(BaseSettings):
     # demo-data seeding so neither can ship to a live deployment.
     environment: str = "development"
 
-    # --- Database ---
-    database_url: str = "sqlite:///./digimess.db"
+    # --- Database (PostgreSQL) ---
+    # Set DATABASE_URL or the DATABASE_* components below (see .env.example).
+    database_url: str = ""
+    database_host: str = ""
+    database_port: int = 5432
+    database_name: str = ""
+    database_user: str = ""
+    database_password: str = ""
     auto_migrate_on_startup: bool = True
     # Demo-data seeding is OFF by default. Enable explicitly for local dev only;
     # it must never populate a real deployment.
@@ -48,8 +55,10 @@ class Settings(BaseSettings):
     upload_dir: str = "./uploads"
     max_upload_bytes: int = 5 * 1024 * 1024  # 5 MB per document
 
-    # --- Admin seed (super admin created by app.seed) ---
+    # --- Admin bootstrap (created on empty DB at startup / app.seed) ---
     seed_admin_email: str = "admin@kadelivery.app"
+    seed_admin_password: str = ""
+    auto_seed_admin_on_startup: bool = True
     seed_pickup_delivery: bool = True
     seed_active_delivery: bool = False
 
@@ -134,11 +143,48 @@ class Settings(BaseSettings):
         return self.environment.strip().lower() in {"production", "prod"}
 
     @model_validator(mode="after")
+    def _resolve_database_url(self) -> "Settings":
+        """Build a PostgreSQL URL from DATABASE_* when host is set."""
+        host = self.database_host.strip()
+        if host:
+            user = self.database_user.strip()
+            name = self.database_name.strip()
+            if not user or not name:
+                raise ValueError(
+                    "DATABASE_USER and DATABASE_NAME are required when DATABASE_HOST is set."
+                )
+            password = quote_plus(self.database_password)
+            self.database_url = (
+                f"postgresql+psycopg2://{user}:{password}@"
+                f"{host}:{self.database_port}/{name}"
+            )
+            return self
+
+        url = self.database_url.strip()
+        if not url:
+            raise ValueError(
+                "Database not configured. Set DATABASE_HOST, DATABASE_NAME, "
+                "DATABASE_USER, DATABASE_PASSWORD (and optional DATABASE_PORT) "
+                "or a single DATABASE_URL."
+            )
+        if url.startswith("sqlite"):
+            if self.environment.strip().lower() == "test":
+                return self
+            raise ValueError(
+                "SQLite is not supported. Use PostgreSQL (DATABASE_* or DATABASE_URL)."
+            )
+        return self
+
+    @model_validator(mode="after")
     def _require_secrets_in_production(self) -> "Settings":
         """Fail fast: a production deployment must supply a real JWT secret."""
         if self.is_production and not self.jwt_secret.strip():
             raise ValueError(
                 "JWT_SECRET must be set in production (no dev fallback is provided)."
+            )
+        if self.is_production and not self.seed_admin_password.strip():
+            raise ValueError(
+                "SEED_ADMIN_PASSWORD must be set in production for the initial admin account."
             )
         return self
 

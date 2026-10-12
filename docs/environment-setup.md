@@ -7,7 +7,10 @@ defaults in `app/config.py`; override for anything non-local.
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `DATABASE_URL` | `sqlite:///./digimess.db` | SQLAlchemy DB URL. Swap for PostgreSQL in prod. |
+| `DATABASE_HOST` / `DATABASE_PORT` / `DATABASE_NAME` / `DATABASE_USER` / `DATABASE_PASSWORD` | — | PostgreSQL connection (preferred). |
+| `DATABASE_URL` | — | Optional full SQLAlchemy URL instead of component vars. |
+| `SEED_ADMIN_EMAIL` / `SEED_ADMIN_PASSWORD` | `admin@kadelivery.app` / — | First super-admin created when the DB has no users. |
+| `AUTO_SEED_ADMIN_ON_STARTUP` | `true` | Bootstrap admin on empty DB at API startup. |
 | `JWT_SECRET` | `dev-secret-change-me` | JWT signing key. **Set a long random value in prod.** |
 | `JWT_ALGORITHM` | `HS256` | JWT algorithm. |
 | `ACCESS_TOKEN_EXPIRE_MINUTES` | `1440` | Access-token lifetime. |

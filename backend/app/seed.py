@@ -15,6 +15,7 @@ from __future__ import annotations
 
 from sqlalchemy import select
 
+from app.config import settings
 from app.core.security import hash_password
 from app.database import SessionLocal
 from app.models.enums import AdminRole, ApprovalStatus, DocumentStatus, UserRole
@@ -24,6 +25,42 @@ from app.models.base import utcnow
 
 PASSWORD = "password123"
 RIDER_LAT, RIDER_LNG = 18.5250, 73.8500
+
+
+def _admin_bootstrap_password() -> str:
+    configured = settings.seed_admin_password.strip()
+    if configured:
+        return configured
+    if settings.is_production:
+        raise RuntimeError(
+            "SEED_ADMIN_PASSWORD must be set to bootstrap the first admin account."
+        )
+    return PASSWORD
+
+
+def seed_admin() -> None:
+    """Create the super-admin account (idempotent). Used on first startup."""
+    email = settings.seed_admin_email.strip().lower()
+    if not email:
+        raise RuntimeError("SEED_ADMIN_EMAIL must be set.")
+    password = _admin_bootstrap_password()
+
+    with SessionLocal() as db:
+        user = db.execute(select(User).where(User.email == email)).scalar_one_or_none()
+        if user is None:
+            user = User(
+                email=email,
+                full_name="Platform Admin",
+                phone="+919000000010",
+                hashed_password=hash_password(password),
+                roles=UserRole.admin.value,
+            )
+            db.add(user)
+            db.flush()
+        user.admin_role = AdminRole.super_admin
+        if not user.has_role(UserRole.admin):
+            user.add_role(UserRole.admin)
+        db.commit()
 
 
 def _get_or_create_user(db, email: str, **kwargs) -> tuple[User, bool]:
@@ -71,15 +108,12 @@ def _ensure_rider_profile(
 
 
 def seed() -> None:
+    seed_admin()
     with SessionLocal() as db:
-        super_admin, _ = _get_or_create_user(
-            db,
-            "admin@kadelivery.app",
-            full_name="Aditi Admin",
-            phone="+919000000010",
-            roles=UserRole.admin.value,
-        )
-        super_admin.admin_role = AdminRole.super_admin
+        super_admin = db.execute(
+            select(User).where(User.email == settings.seed_admin_email.strip().lower())
+        ).scalar_one()
+        super_admin.full_name = "Aditi Admin"
 
         verifier, _ = _get_or_create_user(
             db,

@@ -21,22 +21,12 @@ logger = logging.getLogger(__name__)
 _BACKEND_ROOT = Path(__file__).resolve().parent.parent
 
 
-def _ensure_sqlite_parent_dir() -> None:
-    url = settings.database_url
-    if not url.startswith("sqlite"):
-        return
-    if ":memory:" in url:
-        return
-    path_part = url.split("///", 1)[-1] if "///" in url else url.replace("sqlite:///", "")
-    if not path_part:
-        return
-    Path(path_part).resolve().parent.mkdir(parents=True, exist_ok=True)
-
-
 def run_migrations() -> None:
-    _ensure_sqlite_parent_dir()
     cfg = Config(str(_BACKEND_ROOT / "alembic.ini"))
-    cfg.set_main_option("sqlalchemy.url", settings.database_url)
+    # ConfigParser treats % as interpolation; escape for passwords with encoded chars.
+    cfg.set_main_option(
+        "sqlalchemy.url", settings.database_url.replace("%", "%%")
+    )
     logger.info("Running database migrations (alembic upgrade head)…")
     command.upgrade(cfg, "head")
     logger.info("Database migrations complete.")
@@ -51,6 +41,30 @@ def is_database_empty() -> bool:
         return int(count) == 0
 
 
+def _bootstrap_users() -> None:
+    if not is_database_empty():
+        logger.info("Database already has users — skipping user bootstrap.")
+        return
+
+    if settings.auto_seed_admin_on_startup:
+        logger.info("Empty database — creating super admin account…")
+        from app.seed import seed_admin
+
+        seed_admin()
+        logger.info("Super admin bootstrap complete.")
+
+    if not settings.auto_seed_on_startup or settings.is_production:
+        if settings.is_production and settings.auto_seed_on_startup:
+            logger.warning("Production environment — skipping demo-data seed.")
+        return
+
+    logger.info("Empty database — running demo seed…")
+    from app.seed import seed
+
+    seed()
+    logger.info("Demo seed complete.")
+
+
 def init_database() -> None:
     """Apply migrations and seed when configured and the DB has no users."""
     if not settings.auto_migrate_on_startup:
@@ -63,22 +77,8 @@ def init_database() -> None:
         logger.exception("Database migration failed")
         raise
 
-    if not settings.auto_seed_on_startup:
-        return
-
-    if settings.is_production:
-        logger.warning("Production environment — skipping demo-data seed.")
-        return
-
     try:
-        if is_database_empty():
-            logger.info("Empty database detected — running seed…")
-            from app.seed import seed
-
-            seed()
-            logger.info("Database seed complete.")
-        else:
-            logger.info("Database already has users — skipping seed.")
+        _bootstrap_users()
     except Exception:
-        logger.exception("Database seed failed")
+        logger.exception("Database user bootstrap failed")
         raise

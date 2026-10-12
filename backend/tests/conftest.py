@@ -8,6 +8,12 @@ from __future__ import annotations
 
 import os
 
+os.environ["ENVIRONMENT"] = "test"
+# Override backend/.env PostgreSQL vars so tests stay on in-memory SQLite.
+os.environ["DATABASE_HOST"] = ""
+os.environ["DATABASE_NAME"] = ""
+os.environ["DATABASE_USER"] = ""
+os.environ["DATABASE_PASSWORD"] = ""
 os.environ["DATABASE_URL"] = "sqlite:///./test_digimess.db"
 os.environ["JWT_SECRET"] = "test-secret"
 # Tighten location policy so tests can exercise jump/speed rejection.
