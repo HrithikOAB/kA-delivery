@@ -17,12 +17,18 @@ from app.models.enums import OrderStatus
 from app.models.order import Order
 from app.models.user import User
 from app.schemas.partner_api import (
+    PartnerCancelOut,
     PartnerDeliveryPartner,
     PartnerLocation,
     PartnerOrderOut,
+    PartnerStatusOut,
+    PartnerTimelineStep,
     PartnerTrackingOut,
 )
-from app.services import tracking_service
+from app.services import audit_service, notification_service, tracking_service
+from app.services.order_admin_service import void_internal_dispatch
+from app.services.state_machine import InvalidTransition, transition_order
+from app.services.ws_manager import manager
 
 _REF_RE = re.compile(r"^(?:ORD-?)?(\d+)$", re.IGNORECASE)
 
@@ -115,4 +121,96 @@ def tracking(db: Session, raw: str | int) -> PartnerTrackingOut:
         location=location,
         eta_minutes=snap.eta_minutes,
         distance_km=snap.distance_km,
+    )
+
+
+def order_status(db: Session, raw: str | int) -> PartnerStatusOut:
+    ref = normalize_ref(raw)
+    order = find_by_ref(db, ref)
+    if order is None:
+        raise HTTPException(status_code=404, detail="Order not found")
+
+    snap = tracking_service.build_snapshot(db, order)
+    delivery = db.execute(
+        select(Delivery).where(Delivery.order_id == order.id)
+    ).scalar_one_or_none()
+
+    timeline = [
+        PartnerTimelineStep(**step) for step in snap.timeline
+    ]
+    return PartnerStatusOut(
+        order_id=ref,
+        status=order.status.value,
+        delivery_status=delivery.status.value if delivery else None,
+        updated_at=snap.updated_at,
+        timeline=timeline,
+    )
+
+
+def cancel_order(
+    db: Session, raw: str | int, reason: str | None = None
+) -> PartnerCancelOut:
+    ref = normalize_ref(raw)
+    order = find_by_ref(db, ref)
+    if order is None:
+        raise HTTPException(status_code=404, detail="Order not found")
+
+    if order.status == OrderStatus.delivered:
+        raise HTTPException(status_code=409, detail="Order already delivered")
+
+    if order.status == OrderStatus.cancelled:
+        return PartnerCancelOut(
+            order_id=ref,
+            status=order.status.value,
+            already_cancelled=True,
+            updated_at=order.updated_at,
+        )
+
+    delivery = db.execute(
+        select(Delivery).where(Delivery.order_id == order.id)
+    ).scalar_one_or_none()
+    rider_id = delivery.rider_id if delivery is not None else None
+
+    void_internal_dispatch(db, order)
+
+    if order.fulfillment_type == "external":
+        order.external_status = "cancelled"
+
+    detail = (reason or "").strip() or "partner"
+    try:
+        transition_order(
+            db, order, OrderStatus.cancelled, actor_user_id=None, detail=detail
+        )
+    except InvalidTransition as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+    order.cancelled_reason = f"partner:{detail}"
+
+    audit_service.record(
+        db,
+        actor_user_id=None,
+        action="partner_order_cancelled",
+        target_type="order",
+        target_id=order.id,
+        order_id=order.id,
+        detail=f"ref={ref} reason={detail}",
+    )
+
+    if rider_id is not None and not order.is_test:
+        notification_service.notify(
+            rider_id,
+            "Order cancelled",
+            f"Order {ref} was cancelled by the partner platform.",
+            {"order_id": order.id, "external_order_ref": ref, "type": "order_cancelled"},
+        )
+
+    db.commit()
+    manager.publish(order.id)
+    db.refresh(order)
+
+    return PartnerCancelOut(
+        order_id=ref,
+        status=order.status.value,
+        already_cancelled=False,
+        updated_at=order.updated_at,
     )

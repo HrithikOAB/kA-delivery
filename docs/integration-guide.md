@@ -58,8 +58,12 @@ a bearer token, we send `Authorization: Bearer <token>`. If your API rejects it
    pickup, drop-off and contact details on our side so the rider app keeps
    working even if your API is briefly unavailable. Orders your API reports as
    `REJECTED` or `CANCELLED` cannot be assigned.
-4. You call `POST /api/v1/partner/tracking` for status, partner details and the
-   partner's live location.
+4. You call `POST /api/v1/partner/status` for order status and a lifecycle
+   timeline, or `POST /api/v1/partner/tracking` when you also need partner
+   contact details and live location.
+5. If the order is cancelled on your platform, call
+   `POST /api/v1/partner/orders/cancel` so we stop dispatch and mark the order
+   cancelled on our side.
 
 Order ids may be sent as `"ORD-10001"` or `10001`; both refer to the same order
 and responses always use the `ORD-<n>` form.
@@ -89,7 +93,40 @@ to retry):
 
 ---
 
-## 2. Track an order
+## 2. Order status (timeline)
+
+```
+POST /api/v1/partner/status
+X-API-Key: <key>
+{ "order_id": "ORD-10001" }        // or { "orderId": 10001 }
+```
+
+`404` if the id was never registered. Otherwise a lightweight snapshot (no map,
+ETA, or rider contact):
+
+```json
+{
+  "order_id": "ORD-10001",
+  "status": "assigned",
+  "delivery_status": "accepted",
+  "updated_at": "2026-10-11T12:20:00.104Z",
+  "timeline": [
+    { "status": "placed", "label": "Order placed", "state": "done" },
+    { "status": "accepted", "label": "Accepted by mess", "state": "done" },
+    { "status": "preparing", "label": "Preparing your meal", "state": "done" },
+    { "status": "ready", "label": "Ready for pickup", "state": "done" },
+    { "status": "assigned", "label": "Rider assigned", "state": "current" },
+    { "status": "picked_up", "label": "Picked up", "state": "pending" }
+  ]
+}
+```
+
+Poll every few seconds while the order is active. Use tracking (below) when you
+need live coordinates.
+
+---
+
+## 3. Track an order
 
 ```
 POST /api/v1/partner/tracking
@@ -148,7 +185,39 @@ placed → accepted → preparing → ready → assigned → picked_up → out_f
 
 ---
 
-## 3. What we read from your API
+## 4. Cancel an order
+
+```
+POST /api/v1/partner/orders/cancel
+X-API-Key: <key>
+{ "order_id": "ORD-10001", "reason": "customer requested" }   // reason optional
+```
+
+| Response | Meaning |
+|----------|---------|
+| `404` | Id was never registered |
+| `409` | Order is already `delivered` |
+| `200` | Order is now `cancelled` (or was already cancelled — see below) |
+
+Success body:
+
+```json
+{
+  "order_id": "ORD-10001",
+  "status": "cancelled",
+  "already_cancelled": false,
+  "updated_at": "2026-10-11T12:35:00.104Z"
+}
+```
+
+Calling cancel again for the same id returns `200` with
+`already_cancelled: true` (safe to retry). We void any in-flight internal
+dispatch (offers, batches, deliveries) and notify the assigned rider when
+applicable.
+
+---
+
+## 5. What we read from your API
 
 `POST <EXTERNAL_ORDER_API_URL>` with `{ "order_id": "ORD-10001" }`. We use
 `customer_details` (name, contact, address, location, instruction),

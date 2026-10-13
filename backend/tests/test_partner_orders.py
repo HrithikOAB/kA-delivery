@@ -63,9 +63,21 @@ def test_partner_api_disabled_without_key(client):
 
 @pytest.mark.parametrize("headers", [{}, {"X-API-Key": "wrong"}])
 def test_partner_api_rejects_missing_or_bad_key(client, partner_key, headers):
-    for path in ("/api/v1/partner/orders", "/api/v1/partner/tracking"):
+    for path in (
+        "/api/v1/partner/orders",
+        "/api/v1/partner/tracking",
+        "/api/v1/partner/status",
+        "/api/v1/partner/orders/cancel",
+    ):
         resp = client.post(path, json={"order_id": "ORD-1"}, headers=headers)
         assert resp.status_code == 401
+
+
+def _cancel(client, ref: str, reason: str | None = None):
+    body: dict = {"order_id": ref}
+    if reason is not None:
+        body["reason"] = reason
+    return client.post("/api/v1/partner/orders/cancel", json=body, headers=H)
 
 
 # --- Registration ---------------------------------------------------------
@@ -261,6 +273,138 @@ def test_assign_external_and_mark_delivered(client, partner_key):
     ).json()
     assert done["external_status"] == "delivered"
     assert done["status"] == "delivered"
+
+
+# --- Partner status -------------------------------------------------------
+
+def test_status_unknown_order_is_404(client, partner_key):
+    resp = client.post("/api/v1/partner/status", json={"order_id": "ORD-123"}, headers=H)
+    assert resp.status_code == 404
+
+
+def test_status_before_assignment(client, partner_key):
+    _register(client, "ORD-322")
+    resp = client.post("/api/v1/partner/status", json={"orderId": 322}, headers=H)
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["order_id"] == "ORD-322"
+    assert body["status"] == "placed"
+    assert body["delivery_status"] is None
+    assert "location" not in body
+    current = [s for s in body["timeline"] if s["state"] == "current"]
+    assert current == [{"status": "placed", "label": "Order placed", "state": "current"}]
+
+
+def test_status_during_delivery(client, partner_key):
+    rtok = login(client, "rider", "rider@digimess.app")
+    ids = drive_to_out_for_delivery(client, rtok)
+    from app.database import SessionLocal
+    from app.models.order import Order
+
+    with SessionLocal() as db:
+        ref = db.get(Order, ids["order_id"]).external_order_ref
+
+    resp = client.post("/api/v1/partner/status", json={"order_id": ref}, headers=H)
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body["status"] == "out_for_delivery"
+    assert body["delivery_status"] in {"picked_up", "delivering"}
+    assert "location" not in body
+    statuses = [s["status"] for s in body["timeline"] if s["state"] == "current"]
+    assert statuses == ["out_for_delivery"]
+
+
+# --- Partner cancel -------------------------------------------------------
+
+def test_cancel_unknown_order_is_404(client, partner_key):
+    resp = _cancel(client, "ORD-999")
+    assert resp.status_code == 404
+
+
+def test_cancel_placed_order(client, partner_key):
+    _register(client, "ORD-601")
+    resp = _cancel(client, "ORD-601", reason="customer requested")
+    assert resp.status_code == 200, resp.text
+    body = resp.json()
+    assert body == {
+        **body,
+        "order_id": "ORD-601",
+        "status": "cancelled",
+        "already_cancelled": False,
+    }
+    from app.database import SessionLocal
+    from app.models.order import Order
+
+    with SessionLocal() as db:
+        order = db.execute(
+            select(Order).where(Order.external_order_ref == "ORD-601")
+        ).scalar_one()
+        assert order.cancelled_reason == "partner:customer requested"
+
+
+def test_cancel_is_idempotent(client, partner_key):
+    _register(client, "ORD-602")
+    assert _cancel(client, "ORD-602").status_code == 200
+    again = _cancel(client, "ORD-602")
+    assert again.status_code == 200
+    assert again.json()["already_cancelled"] is True
+
+
+def test_cancel_delivered_order_is_409(client, partner_key):
+    out = _register(client, register_external_order())
+    order_id = out["internal_id"]
+    atok = admin_token(client)
+    client.post(
+        f"/api/v1/admin/orders/{order_id}/assign",
+        headers=_auth(atok),
+        json={"mode": "external", "provider": "zomato", "reference": "ZOM-1"},
+    )
+    client.post(
+        f"/api/v1/admin/orders/{order_id}/external-status",
+        headers=_auth(atok),
+        json={"status": "delivered"},
+    )
+    resp = _cancel(client, out["order_id"])
+    assert resp.status_code == 409
+
+
+def test_cancel_after_assign_voids_delivery(client, partner_key):
+    from app.database import SessionLocal
+    from app.models.delivery import Delivery
+    from app.models.enums import DeliveryStatus
+
+    rtok = _online_rider(client)
+    ref = register_external_order()
+    out = _register(client, ref)
+    atok = admin_token(client)
+    client.post(
+        f"/api/v1/admin/orders/{out['internal_id']}/assign",
+        headers=_auth(atok),
+        json={"mode": "internal", "rider_id": _rahul_id(client, atok, out["internal_id"])},
+    )
+    resp = _cancel(client, ref)
+    assert resp.status_code == 200, resp.text
+    with SessionLocal() as db:
+        delivery = db.execute(
+            select(Delivery).where(Delivery.order_id == out["internal_id"])
+        ).scalar_one()
+        assert delivery.status == DeliveryStatus.cancelled
+    offers = client.get("/api/v1/rider/offers", headers=_auth(rtok)).json()
+    assert not offers
+
+
+def test_cancel_during_out_for_delivery(client, partner_key):
+    rtok = login(client, "rider", "rider@digimess.app")
+    ids = drive_to_out_for_delivery(client, rtok)
+    from app.database import SessionLocal
+    from app.models.order import Order
+
+    with SessionLocal() as db:
+        ref = db.get(Order, ids["order_id"]).external_order_ref
+
+    resp = _cancel(client, ref)
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["status"] == "cancelled"
 
 
 # --- Partner tracking -----------------------------------------------------

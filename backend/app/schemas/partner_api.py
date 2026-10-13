@@ -81,3 +81,28 @@ class PartnerTrackingOut(BaseModel):
     location: PartnerLocation | None = None
     eta_minutes: float | None = None
     distance_km: float | None = None
+
+
+class PartnerTimelineStep(BaseModel):
+    status: str
+    label: str
+    state: str
+
+
+class PartnerStatusOut(BaseModel):
+    order_id: str
+    status: str
+    delivery_status: str | None = None
+    updated_at: datetime
+    timeline: list[PartnerTimelineStep]
+
+
+class PartnerOrderCancel(PartnerOrderRef):
+    reason: str | None = Field(default=None, max_length=512)
+
+
+class PartnerCancelOut(BaseModel):
+    order_id: str
+    status: str
+    already_cancelled: bool = False
+    updated_at: datetime

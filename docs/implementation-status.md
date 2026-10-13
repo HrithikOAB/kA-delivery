@@ -59,6 +59,10 @@ reconciled.
 ## Live tracking
 
 ### REST
+- `POST /api/v1/partner/status` (`X-API-Key`) — order + delivery status and
+  lifecycle timeline (no live map).
+- `POST /api/v1/partner/orders/cancel` (`X-API-Key`) — partner-initiated
+  cancellation (voids dispatch, idempotent if already cancelled).
 - `POST /api/v1/partner/tracking` (`X-API-Key`) — external-partner tracking by
   order id: status, delivery partner details, live location with
   `is_stale`/`age_seconds`, and ETA/distance.
@@ -136,7 +140,8 @@ Added on top of the base app:
   customer, items and totals live from the external `getRiderOrder` API
   (`external_order_client`); on assignment `order_hydration_service` caches that
   content on the order so dispatch and the rider app work unchanged.
-  `POST /api/v1/partner/tracking` returns status, partner details and live
+  `POST /api/v1/partner/status` and `POST /api/v1/partner/tracking` return
+  status; tracking also includes partner details and live
   location (built on `tracking_service.build_snapshot`). The old full-payload
   ingestion endpoint, the test-order tool, and the customer/mess-owner order APIs
   were removed.

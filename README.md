@@ -24,8 +24,8 @@ ops assign a delivery partner, and the platform polls
 
 ## Features
 
-- **External partner API**: register an order id, then poll tracking (status,
-  delivery partner details, live coordinates). Authenticated with `X-API-Key`.
+- **External partner API**: register an order id, poll status or tracking,
+  cancel when needed. Authenticated with `X-API-Key`.
 - **Delivery partner**: register (+ vehicle info) with approval gating,
   go online/offline, receive & accept/reject batched delivery offers, navigate,
   confirm pickup, **complete each stop with the customer's OTP**, and view

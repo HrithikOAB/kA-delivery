@@ -458,8 +458,8 @@ def assign_internal(db: Session, order: Order, admin: User, rider_id: int) -> Or
     return order
 
 
-def _close_internal_dispatch(db: Session, order: Order) -> None:
-    """Cancel any internal batch/delivery/open offers for an order (external handoff)."""
+def void_internal_dispatch(db: Session, order: Order) -> None:
+    """Cancel any internal batch/delivery/open offers for an order."""
     delivery = _delivery_for(db, order.id)
     if delivery is None:
         return
@@ -488,7 +488,7 @@ def assign_external(
     if order.status in (OrderStatus.delivered, OrderStatus.cancelled):
         raise HTTPException(status_code=409, detail=f"Order already {order.status.value}")
 
-    _close_internal_dispatch(db, order)
+    void_internal_dispatch(db, order)
 
     order.fulfillment_type = "external"
     order.external_provider = provider
